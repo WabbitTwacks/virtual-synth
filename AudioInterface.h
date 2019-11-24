@@ -18,10 +18,10 @@ public:
 
 	bool Create(std::string sOutputDevice, unsigned int nSampleRate = 44100, unsigned int nChannels = 1, unsigned int nBlocks = 8, unsigned int nBlockSamples = 512);
 	void Destroy();
-	void SetUserFunction(double(*func)(double));
+	void SetUserFunction(double(*func)(double, byte));
 	double Clip(double dSample, double dMax);
 	void Stop();
-	virtual double ProcessSample(double dTime); //override to process current sample
+	virtual double ProcessSample(double dTime, byte channel); //override to process current sample
 	double GetTime();
 	const bool GetActive();
 
@@ -29,7 +29,7 @@ public:
 
 
 private:
-	double(*userFunction)(double);
+	double(*userFunction)(double, byte);
 
 	unsigned int nSampleRate;
 	unsigned int nChannels;

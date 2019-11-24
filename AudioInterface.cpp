@@ -54,12 +54,12 @@ bool AudioInterface::Create(string sOutputDevice, unsigned int nSampleRate, unsi
 	}
 
 	//Allocate wave/block memory
-	pBlockMemory = new short[nBlockCount * nBlockSamples];
+	pBlockMemory = new short[nBlockCount * nChannels * nBlockSamples];
 
 	if (pBlockMemory == nullptr)
 		return false;
 
-	ZeroMemory(pBlockMemory, sizeof(short) * nBlockCount * nBlockSamples);
+	ZeroMemory(pBlockMemory, sizeof(short) * nBlockCount * nChannels * nBlockSamples);
 
 	pWaveHeaders = new WAVEHDR[nBlockCount];
 	if (pWaveHeaders == nullptr)
@@ -73,8 +73,8 @@ bool AudioInterface::Create(string sOutputDevice, unsigned int nSampleRate, unsi
 	//Link headers to block memory
 	for (unsigned int i = 0; i < nBlockCount; i++)
 	{
-		pWaveHeaders[i].dwBufferLength = nBlockSamples * sizeof(short);
-		pWaveHeaders[i].lpData = (LPSTR)(pBlockMemory + (i * nBlockSamples));
+		pWaveHeaders[i].dwBufferLength = nBlockSamples * sizeof(short) * nChannels;
+		pWaveHeaders[i].lpData = (LPSTR)(pBlockMemory + (i * nBlockSamples * nChannels));
 	}
 
 
@@ -104,7 +104,7 @@ void AudioInterface::Stop()
 	audioThread.join();
 }
 
-double AudioInterface::ProcessSample(double dTime)
+double AudioInterface::ProcessSample(double dTime, byte)
 {
 	return 0.0;
 }
@@ -132,7 +132,7 @@ vector<string> AudioInterface::GetDevices()
 	return sDevices;
 }
 
-void AudioInterface::SetUserFunction(double(*func)(double))
+void AudioInterface::SetUserFunction(double(*func)(double, byte))
 {
 	this->userFunction = func;
 }
@@ -150,7 +150,7 @@ double AudioInterface::Clip(double dSample, double dMax)
 		return fmax(dSample, -dMax);
 }
 
-//Handler for requesting more data
+//Handler for processing next block of data
 void AudioInterface::waveOutProc(HWAVEOUT hWaveOut, UINT uMsg, DWORD dwParam1, DWORD dwParam2)
 {
 	if (uMsg != WOM_DONE)
@@ -174,7 +174,8 @@ void AudioInterface::MainThread()
 	double dTimeStep = 1.0 / (double)nSampleRate;
 
 	double dMaxSample = (double)SHRT_MAX;
-	short nPreviousSample = 0;
+	short *nPreviousSample = new short[nChannels];
+	ZeroMemory(nPreviousSample, sizeof(short) * nChannels);
 
 	while (bReady)
 	{
@@ -193,18 +194,32 @@ void AudioInterface::MainThread()
 			waveOutUnprepareHeader(hwDevice, &pWaveHeaders[nBlockCurrent], sizeof(WAVEHDR));
 		}
 
-		short nNewSample = 0;
-		int nCurrentBlock = nBlockCurrent * nBlockSamples;
+		short *nNewSample = new short[nChannels];
+		ZeroMemory(nNewSample, sizeof(short)*nChannels);
 
-		for (unsigned int i = 0; i < nBlockSamples; i++)
+		int nCurrentBlock = nBlockCurrent * nBlockSamples * nChannels;
+
+		for (unsigned int i = 0; i < nBlockSamples * nChannels; i += nChannels)
 		{
 			if (userFunction == nullptr)
-				nNewSample = (short)(Clip(ProcessSample(dGlobalTime), 1.0) * dMaxSample);
+			{ 
+				for (unsigned int n = 0; n < nChannels; n++)
+					nNewSample[n] = (short)(Clip(ProcessSample(dGlobalTime, n), 1.0) * dMaxSample);
+			}				
 			else
-				nNewSample = (short)(Clip(userFunction(dGlobalTime), 1.0) * dMaxSample);
+			{
+				for (unsigned int n = 0; n < nChannels; n++)
+					nNewSample[n] = (short)(Clip(userFunction(dGlobalTime, n), 1.0) * dMaxSample);
+			}	
 
-			pBlockMemory[nCurrentBlock + i] = nNewSample;
-			nPreviousSample = nNewSample;
+			//nNewSample[0] = 0;
+
+			for (unsigned int n = 0; n < nChannels; n++)
+			{
+				pBlockMemory[nCurrentBlock + i + n] = nNewSample[n];
+				nPreviousSample[n] = nNewSample[n];
+			}
+				
 			dGlobalTime = dGlobalTime + dTimeStep;
 		}
 
@@ -213,5 +228,9 @@ void AudioInterface::MainThread()
 		waveOutWrite(hwDevice, &pWaveHeaders[nBlockCurrent], sizeof(WAVEHDR));
 		nBlockCurrent++;
 		nBlockCurrent %= nBlockCount;
+
+		delete[] nNewSample;
 	}
+
+	delete[] nPreviousSample;
 }
