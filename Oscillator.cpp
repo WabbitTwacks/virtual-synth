@@ -87,7 +87,7 @@ void Oscillator::ResetAM()
 
 void Oscillator::SetLFO(bool bLFO)
 {
-	parameters.bLFO = true;
+	parameters.bLFO = bLFO;
 }
 
 double Oscillator::GetVolume()

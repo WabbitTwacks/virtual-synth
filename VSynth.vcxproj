@@ -136,6 +136,7 @@
   <ItemGroup>
     <ClInclude Include="AudioInterface.h" />
     <ClInclude Include="CfgWindow.h" />
+    <ClInclude Include="Helpers.h" />
     <ClInclude Include="Oscillator.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

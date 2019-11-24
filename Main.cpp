@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cmath>
 
+#include "Helpers.h"
 #include "AudioInterface.h"
 #include "CfgWindow.h"
 #include "Oscillator.h"
@@ -15,6 +16,11 @@
 #define APP_HEIGHT 600
 
 #define INIT_MASTER_VOLUME 10
+
+#define LFO_MIN 0.001
+#define LFO_MAX 20.00
+#define FREQ_MIN 20.00
+#define FREQ_MAX 20000.00
 
 //matrix devices
 #define R_OSC1 0
@@ -135,10 +141,6 @@ wxIMPLEMENT_APP(MyApp);
 
 bool MyApp::OnInit()
 {
-	MyFrame *frame = new MyFrame();
-	frame->SetSize({ APP_WIDTH, APP_HEIGHT });
-	pFrame = frame;
-
 	vector<string> devices = AudioInterface::GetDevices();
 
 	audioIF = new AudioInterface(devices[0], 44100, 2, 8, 512); //use first device in list
@@ -157,6 +159,10 @@ bool MyApp::OnInit()
 
 	synthVars.osc[1].SetLFO(true);
 	synthVars.osc[1].SetFrequency(1.0);
+
+	MyFrame *frame = new MyFrame();
+	frame->SetSize({ APP_WIDTH, APP_HEIGHT });
+	pFrame = frame;
 
 	frame->Show(true);
 
@@ -235,7 +241,7 @@ MyFrame::MyFrame()
 	Bind(wxEVT_TEXT, &MyFrame::OnOscFreqEdit, this, ID_FreqEdit1);
 	
 
-	freqOsc[0] = new wxSlider(oscPanel[0], ID_Freq1, (int)synthVars.osc[0].GetFrequency(), 1, 100, { 6, 74 });
+	freqOsc[0] = new wxSlider(oscPanel[0], ID_Freq1, (int)synthVars.osc[0].GetFrequency(), 1, 1000, { 6, 74 });
 	Bind(wxEVT_SLIDER, &MyFrame::OnOscFreq, this, ID_Freq1);
 
 	checkDrone[0] = new wxCheckBox(oscPanel[0], ID_Drone1, "Drone", { 6, 32 });
@@ -258,7 +264,7 @@ MyFrame::MyFrame()
 	freqEditOsc[1] = new wxTextCtrl(oscPanel[1], ID_FreqEdit2, wxString::Format("%.2f", synthVars.osc[1].GetFrequency()), { 6, 50 }, { 50, wxDefaultSize.GetY() }, wxTE_CENTRE);
 	Bind(wxEVT_TEXT, &MyFrame::OnOscFreqEdit, this, ID_FreqEdit2);
 
-	freqOsc[1] = new wxSlider(oscPanel[1], ID_Freq2, (int)synthVars.osc[1].GetFrequency(), 1, 100, { 6, 74 });
+	freqOsc[1] = new wxSlider(oscPanel[1], ID_Freq2, (int)synthVars.osc[1].GetFrequency(), 1, 1000, { 6, 74 });
 	Bind(wxEVT_SLIDER, &MyFrame::OnOscFreq, this, ID_Freq2);
 
 	checkDrone[1] = new wxCheckBox(oscPanel[1], ID_Drone2, "Drone", { 6, 32 });
@@ -377,26 +383,33 @@ void MyFrame::OnOscFreq(wxCommandEvent & event)
 
 	if (s)
 	{
-		double f1 = (double)s->GetValue(); //TODO: refactor to a function
-		double b = log(20000.0/1.0)/(100.0 - 1.0);
-		double a = 20000.0 / exp(b*100.0);
-		f1 = a * exp(b * f1);
-
 		if (s->GetId() == ID_Freq1)
 		{
+			double f1;
+			if (synthVars.osc[0].IsLFO())
+				f1 = s->GetValue() * LFO_MAX / 1000.0;
+			else
+				f1 = LinToLog(s->GetValue(), 1.0, 1000.0, FREQ_MIN, FREQ_MAX);
+
 			synthVars.osc[0].SetFrequency(f1);
 
 			freqEditOsc[0]->SetValue(wxString::Format("%.2f", f1));
 
-			SetStatusText(wxString::Format("Pitch 1: %f Hz", f1));
+			SetStatusText(wxString::Format("Pitch 1: %.2f Hz", f1));
 		}
 		else if (s->GetId() == ID_Freq2)
 		{
+			double f1;
+			if (synthVars.osc[1].IsLFO())
+				f1 = s->GetValue() * LFO_MAX/1000.0;
+			else
+				f1 = LinToLog(s->GetValue(), 1.0, 1000.0, FREQ_MIN, FREQ_MAX);
+
 			synthVars.osc[1].SetFrequency(f1);
 
 			freqEditOsc[1]->SetValue(wxString::Format("%.2f", f1));
 
-			SetStatusText(wxString::Format("Pitch 2: %f Hz", f1));
+			SetStatusText(wxString::Format("Pitch 2: %.2f Hz", f1));
 		}
 	}
 }
@@ -461,13 +474,11 @@ void MyFrame::OnOscLFO(wxCommandEvent & event)
 
 			if (cb->GetValue()) //LFO scaling on
 			{
-				freqOsc[1]->SetMin(0);
-				freqOsc[1]->SetMax(30);
+				freqEditOsc[1]->SetValue(wxString::Format("%.2f", freqOsc[1]->GetValue() * LFO_MAX/1000.0));
 			}
 			else //LFO scaling off
 			{
-				freqOsc[1]->SetMin(20);
-				freqOsc[1]->SetMax(100);
+				freqEditOsc[1]->SetValue(wxString::Format("%.2f", LinToLog(freqOsc[1]->GetValue(), 1.0, 1000.0, FREQ_MIN, FREQ_MAX)));
 			}
 		}
 	}
@@ -485,7 +496,7 @@ void MyFrame::OnOscFreqEdit(wxCommandEvent & event)
 			tx->GetValue().ToCDouble(&r);
 			synthVars.osc[0].SetFrequency(r);
 
-			freqOsc[0]->SetValue(int(exp(r)));
+			//freqOsc[0]->SetValue(int(exp(r)));
 		}
 		else if (tx->GetId() == ID_FreqEdit2 /*&& event.GetKeyCode() == 13*/)
 		{
@@ -493,7 +504,7 @@ void MyFrame::OnOscFreqEdit(wxCommandEvent & event)
 			tx->GetValue().ToCDouble(&r);
 			synthVars.osc[1].SetFrequency(r);
 
-			freqOsc[1]->SetValue(int(exp(r)));
+			//freqOsc[1]->SetValue(int(exp(r)));
 		}
 	}
 }
