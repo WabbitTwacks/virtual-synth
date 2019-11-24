@@ -25,6 +25,7 @@ struct oscParams
 	double dChannelVolume[4] = { 1.0, 1.0, 1.0, 1.0 };
 	double dFineTune = 0.0;
 	double dFreq = 440.0;
+	int8_t nOctaveMod = 0;
 
 	bool bDrone = false;
 
@@ -54,12 +55,14 @@ public:
 	void AddAM(double dAmpMod);
 	void ResetAM();
 	void SetLFO(bool bLFO);
+	void SetOctave(int8_t nOctaveMod); //-3 to +3
 	
 	double GetVolume();
 	double GetChannelVolume(uint8_t nChannel);
 	double GetFrequency();
 	bool GetDrone();
 	bool IsLFO();
+	int8_t GetOctaveMod();
 
 	double Play(double dFreq, double dTime, int8_t nChannel = CH_MONO);
 

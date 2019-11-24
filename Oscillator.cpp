@@ -90,6 +90,16 @@ void Oscillator::SetLFO(bool bLFO)
 	parameters.bLFO = bLFO;
 }
 
+void Oscillator::SetOctave(int8_t nOctaveMod)
+{
+	if (nOctaveMod < -4)
+		nOctaveMod = -4;
+	else if (nOctaveMod > 4)
+		nOctaveMod = 4;
+
+	parameters.nOctaveMod = nOctaveMod;
+}
+
 double Oscillator::GetVolume()
 {
 	return parameters.dVolume;
@@ -116,6 +126,11 @@ bool Oscillator::GetDrone()
 bool Oscillator::IsLFO()
 {
 	return parameters.bLFO;
+}
+
+int8_t Oscillator::GetOctaveMod()
+{
+	return parameters.nOctaveMod;
 }
 
 double Oscillator::Play(double dFreq, double dTime, int8_t nChannel)

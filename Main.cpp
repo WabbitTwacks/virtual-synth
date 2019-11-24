@@ -171,8 +171,9 @@ bool MyApp::OnInit()
 	routingMatrix[R_OSC1][R_MIXR_A] = true;
 	routingMatrix[R_OSC2][R_MIXR_A] = true;
 
-	synthVars.osc[1].SetLFO(true);
-	synthVars.osc[1].SetFrequency(1.0);
+	//synthVars.osc[1].SetLFO(true);
+	//synthVars.osc[1].SetFrequency(1.0);
+	synthVars.osc[1].SetOctave(-1);
 
 	//generate all note frequency values for lookup
 	for (int i = 0; i < 12 * 9; i++)
@@ -629,8 +630,8 @@ double synthFunction(double d, byte channel)
 			{
 				if (synthVars.bKeyDown[n])
 				{
-					uint8_t nSemiTone = (synthVars.nOctave * 12) + n;
-					if (nSemiTone >= 12 * 9) nSemiTone = 12 * 9 - 1;
+					uint8_t nSemiTone = ((synthVars.nOctave + synthVars.osc[i].GetOctaveMod()) * 12) + n;
+					if (nSemiTone >= 12 * 9 || nSemiTone < 0) continue;
 					//double dFrequency = C_SHARP_0 * pow(2, nSemiTone / 12.0);
 					dOutputs[i] += synthVars.osc[i].Play(dNotes[nSemiTone], d, channel);
 				}					
