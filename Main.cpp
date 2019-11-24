@@ -237,8 +237,8 @@ MyFrame::MyFrame()
 	volOsc[0] = new wxSlider(oscPanel[0], ID_Vol1, 100 - (synthVars.osc[0].GetVolume() * 100), 0, 100, { 250, 6 }, wxDefaultSize, wxSL_VERTICAL);
 	Bind(wxEVT_SLIDER, &MyFrame::OnOscVol, this, ID_Vol1);
 
-	freqEditOsc[0] = new wxTextCtrl(oscPanel[0], ID_FreqEdit1, wxString::Format("%.2f", synthVars.osc[0].GetFrequency()), { 6, 50 }, { 50, wxDefaultSize.GetY() }, wxTE_CENTRE);
-	Bind(wxEVT_TEXT, &MyFrame::OnOscFreqEdit, this, ID_FreqEdit1);
+	freqEditOsc[0] = new wxTextCtrl(oscPanel[0], ID_FreqEdit1, wxString::Format("%.2f", synthVars.osc[0].GetFrequency()), { 6, 50 }, { 50, wxDefaultSize.GetY() }, wxTE_CENTRE | wxTE_PROCESS_ENTER);
+	Bind(wxEVT_COMMAND_TEXT_ENTER, &MyFrame::OnOscFreqEdit, this, ID_FreqEdit1);
 	
 
 	freqOsc[0] = new wxSlider(oscPanel[0], ID_Freq1, (int)synthVars.osc[0].GetFrequency(), 1, 1000, { 6, 74 });
@@ -261,8 +261,8 @@ MyFrame::MyFrame()
 	volOsc[1] = new wxSlider(oscPanel[1], ID_Vol2, 100 - (synthVars.osc[1].GetVolume() * 100), 0, 100, { 250, 6 }, wxDefaultSize, wxSL_VERTICAL);
 	Bind(wxEVT_SLIDER, &MyFrame::OnOscVol, this, ID_Vol2);
 
-	freqEditOsc[1] = new wxTextCtrl(oscPanel[1], ID_FreqEdit2, wxString::Format("%.2f", synthVars.osc[1].GetFrequency()), { 6, 50 }, { 50, wxDefaultSize.GetY() }, wxTE_CENTRE);
-	Bind(wxEVT_TEXT, &MyFrame::OnOscFreqEdit, this, ID_FreqEdit2);
+	freqEditOsc[1] = new wxTextCtrl(oscPanel[1], ID_FreqEdit2, wxString::Format("%.2f", synthVars.osc[1].GetFrequency()), { 6, 50 }, { 50, wxDefaultSize.GetY() }, wxTE_CENTRE | wxTE_PROCESS_ENTER);
+	Bind(wxEVT_COMMAND_TEXT_ENTER, &MyFrame::OnOscFreqEdit, this, ID_FreqEdit2);
 
 	freqOsc[1] = new wxSlider(oscPanel[1], ID_Freq2, (int)synthVars.osc[1].GetFrequency(), 1, 1000, { 6, 74 });
 	Bind(wxEVT_SLIDER, &MyFrame::OnOscFreq, this, ID_Freq2);
