@@ -241,7 +241,9 @@ MyFrame::MyFrame()
 	Bind(wxEVT_COMMAND_TEXT_ENTER, &MyFrame::OnOscFreqEdit, this, ID_FreqEdit1);
 	
 
-	freqOsc[0] = new wxSlider(oscPanel[0], ID_Freq1, (int)synthVars.osc[0].GetFrequency(), 1, 1000, { 6, 74 });
+	freqOsc[0] = new wxSlider(oscPanel[0], ID_Freq1, (int)LogToLin(synthVars.osc[0].GetFrequency(), FREQ_MIN, FREQ_MAX, 1.0, 1000.0), 1, 1000, { 6, 74 });
+	if (synthVars.osc[0].IsLFO())
+		freqOsc[0]->SetValue((int)synthVars.osc[0].GetFrequency() *  1000.0 / LFO_MAX);
 	Bind(wxEVT_SLIDER, &MyFrame::OnOscFreq, this, ID_Freq1);
 
 	checkDrone[0] = new wxCheckBox(oscPanel[0], ID_Drone1, "Drone", { 6, 32 });
@@ -264,7 +266,9 @@ MyFrame::MyFrame()
 	freqEditOsc[1] = new wxTextCtrl(oscPanel[1], ID_FreqEdit2, wxString::Format("%.2f", synthVars.osc[1].GetFrequency()), { 6, 50 }, { 50, wxDefaultSize.GetY() }, wxTE_CENTRE | wxTE_PROCESS_ENTER);
 	Bind(wxEVT_COMMAND_TEXT_ENTER, &MyFrame::OnOscFreqEdit, this, ID_FreqEdit2);
 
-	freqOsc[1] = new wxSlider(oscPanel[1], ID_Freq2, (int)synthVars.osc[1].GetFrequency(), 1, 1000, { 6, 74 });
+	freqOsc[1] = new wxSlider(oscPanel[1], ID_Freq2, (int)LogToLin(synthVars.osc[1].GetFrequency(), FREQ_MIN, FREQ_MAX, 1.0, 1000.0), 1, 1000, { 6, 74 });
+	if (synthVars.osc[1].IsLFO())
+		freqOsc[1]->SetValue((int)synthVars.osc[1].GetFrequency() * 1000.0 / LFO_MAX);
 	Bind(wxEVT_SLIDER, &MyFrame::OnOscFreq, this, ID_Freq2);
 
 	checkDrone[1] = new wxCheckBox(oscPanel[1], ID_Drone2, "Drone", { 6, 32 });
@@ -496,7 +500,10 @@ void MyFrame::OnOscFreqEdit(wxCommandEvent & event)
 			tx->GetValue().ToCDouble(&r);
 			synthVars.osc[0].SetFrequency(r);
 
-			//freqOsc[0]->SetValue(int(exp(r)));
+			if (synthVars.osc[0].IsLFO())
+				freqOsc[0]->SetValue((int)synthVars.osc[0].GetFrequency() * 1000.0 / LFO_MAX);
+			else
+				freqOsc[0]->SetValue((int)LogToLin(r, FREQ_MIN, FREQ_MAX, 1.0, 1000.0));
 		}
 		else if (tx->GetId() == ID_FreqEdit2 /*&& event.GetKeyCode() == 13*/)
 		{
@@ -504,7 +511,10 @@ void MyFrame::OnOscFreqEdit(wxCommandEvent & event)
 			tx->GetValue().ToCDouble(&r);
 			synthVars.osc[1].SetFrequency(r);
 
-			//freqOsc[1]->SetValue(int(exp(r)));
+			if (synthVars.osc[1].IsLFO())
+				freqOsc[1]->SetValue((int)synthVars.osc[1].GetFrequency() * 1000.0/LFO_MAX);
+			else
+				freqOsc[1]->SetValue((int)LogToLin(r, FREQ_MIN, FREQ_MAX, 1.0, 1000.0));
 		}
 	}
 }

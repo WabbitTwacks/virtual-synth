@@ -13,7 +13,10 @@ double LinToLog(double linValue, double linStart, double linEnd, double logStart
 
 double LogToLin(double logValue, double logStart, double logEnd, double linStart, double linEnd) //Returns a corresponding linear value mapped from a logarithmic scale to a linear scale
 {
-	//TODO: implement
+	double a = (linEnd - linStart) / log(logEnd / logStart);
+	double b = linEnd - log(logEnd)*a;
 
-	return 0.0;
+	double linValue = a * log(logValue) + b;
+
+	return linValue;
 }
