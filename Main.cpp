@@ -12,6 +12,8 @@
 #include "CfgWindow.h"
 #include "Oscillator.h"
 
+#define C_SHARP_0 16.35
+
 #define APP_WIDTH 800
 #define APP_HEIGHT 600
 
@@ -43,8 +45,10 @@
 
 #define R_NUM_ROUTES 8
 
-//input to device mapping
+//route input to device mapping
 const uint8_t deviceMap[6] = {0, 0, 1, 1, 2, 2};
+
+double dNotes[12 * 9];
 
 const wxString VERSION = "1.00";
 
@@ -56,6 +60,11 @@ struct SynthVars
 
 	Oscillator osc[3];
 
+	bool bKeyDown[16];
+	int8_t nOctave = 3;
+
+	bool octaveKeyDownState = false;
+
 	wxString debug = "Debug: ";
 
 } synthVars;
@@ -64,14 +73,19 @@ bool routingMatrix[R_NUM_DEVS - 1][R_NUM_ROUTES];
 
 double synthFunction(double, byte);
 
+class MyFrame;
+
 class MyApp : public wxApp
 {
 public:
 	virtual ~MyApp();
 
 	virtual bool OnInit();
+	virtual int FilterEvent(wxEvent &event);
 
 	AudioInterface *audioIF;
+
+	MyFrame *pFrame;
 };
 
 class MyFrame : public wxFrame
@@ -112,8 +126,6 @@ private:
 	void OnOscLFO(wxCommandEvent& event);
 };
 
-MyFrame *pFrame;
-
 enum
 {
 	ID_Hello = 1,
@@ -141,6 +153,8 @@ wxIMPLEMENT_APP(MyApp);
 
 bool MyApp::OnInit()
 {
+	ZeroMemory(synthVars.bKeyDown, 16);
+
 	vector<string> devices = AudioInterface::GetDevices();
 
 	audioIF = new AudioInterface(devices[0], 44100, 2, 8, 512); //use first device in list
@@ -160,13 +174,70 @@ bool MyApp::OnInit()
 	synthVars.osc[1].SetLFO(true);
 	synthVars.osc[1].SetFrequency(1.0);
 
+	//generate all note frequency values for lookup
+	for (int i = 0; i < 12 * 9; i++)
+		dNotes[i] = C_SHARP_0 * pow(2, i / 12.0);
+
 	MyFrame *frame = new MyFrame();
 	frame->SetSize({ APP_WIDTH, APP_HEIGHT });
 	pFrame = frame;
 
 	frame->Show(true);
+	frame->SetFocus();
 
 	return true;
+}
+
+int MyApp::FilterEvent(wxEvent & event)
+{
+	if (event.GetEventType() == wxEVT_KEY_DOWN)
+	{
+		for (int i = 0; i < 16; i++)
+		{
+			if (((wxKeyEvent&)event).GetUnicodeKey() == L"AWSEDFTGYHUJKOLP"[i])
+			{
+				pFrame->SetFocus();
+
+				synthVars.bKeyDown[i] = true;
+
+				return false;
+			}
+		}
+
+		if (((wxKeyEvent&)event).GetUnicodeKey() == 'Z' /*&& !synthVars.octaveKeyDownState*/)
+		{
+			//synthVars.octaveKeyDownState = true;
+			synthVars.nOctave--;
+
+			if (synthVars.nOctave < 0)
+				synthVars.nOctave = 0;
+		}
+		else if (((wxKeyEvent&)event).GetUnicodeKey() == 'X' /*&& !synthVars.octaveKeyDownState*/)
+		{
+			//synthVars.octaveKeyDownState = true;
+			synthVars.nOctave++;
+
+			if (synthVars.nOctave > 7)
+				synthVars.nOctave = 7;
+		}
+	
+	}
+	else if (event.GetEventType() == wxEVT_KEY_UP)
+	{
+		for (int i = 0; i < 16; i++)
+		{
+			if (((wxKeyEvent&)event).GetUnicodeKey() == L"AWSEDFTGYHUJKOLP"[i])
+			{
+				pFrame->SetFocus();
+
+				synthVars.bKeyDown[i] = false;
+
+				return false;
+			}
+		}
+	}
+
+	return -1;
 }
 
 MyApp::~MyApp()
@@ -312,7 +383,7 @@ void MyFrame::OnMaster(wxCommandEvent & event)
 		synthVars.nMasterVolume = 100 - s->GetValue();
 		SetStatusText(wxString::Format("Master Volume: %d", synthVars.nMasterVolume));
 	}
-		
+	SetFocus();
 }
 
 void MyFrame::OnOscWave(wxCommandEvent & event)
@@ -326,6 +397,7 @@ void MyFrame::OnOscWave(wxCommandEvent & event)
 		else if (c->GetId() == ID_Wave2)
 			synthVars.osc[1].SetWave(c->GetSelection() + 1);
 	}
+	SetFocus();
 }
 
 void MyFrame::OnOscPan(wxCommandEvent & event)
@@ -358,6 +430,8 @@ void MyFrame::OnOscPan(wxCommandEvent & event)
 			SetStatusText(wxString::Format("Pan 2: %d", s->GetValue()));
 		}
 	}
+
+	SetFocus();
 }
 
 void MyFrame::OnOscVol(wxCommandEvent & event)
@@ -379,6 +453,8 @@ void MyFrame::OnOscVol(wxCommandEvent & event)
 			SetStatusText(wxString::Format("Volume 2: %d", 100 - s->GetValue()));
 		}
 	}
+
+	SetFocus();
 }
 
 void MyFrame::OnOscFreq(wxCommandEvent & event)
@@ -416,6 +492,8 @@ void MyFrame::OnOscFreq(wxCommandEvent & event)
 			SetStatusText(wxString::Format("Pitch 2: %.2f Hz", f1));
 		}
 	}
+
+	SetFocus();
 }
 
 void MyFrame::OnOscDrone(wxCommandEvent & event)
@@ -433,6 +511,7 @@ void MyFrame::OnOscDrone(wxCommandEvent & event)
 			synthVars.osc[1].SetDrone(cb->GetValue());
 		}
 	}
+	SetFocus();
 }
 
 void MyFrame::OnOscRouting(wxCommandEvent & event)
@@ -486,6 +565,7 @@ void MyFrame::OnOscLFO(wxCommandEvent & event)
 			}
 		}
 	}
+	SetFocus();
 }
 
 void MyFrame::OnOscFreqEdit(wxCommandEvent & event)
@@ -542,7 +622,20 @@ double synthFunction(double d, byte channel)
 		if (synthVars.osc[i].GetDrone())
 		{
 			dOutputs[i] = synthVars.osc[i].Play(synthVars.osc[i].GetFrequency(), d, channel);
-		}			
+		}
+		else
+		{
+			for (int n = 0; n < 16; n++)
+			{
+				if (synthVars.bKeyDown[n])
+				{
+					uint8_t nSemiTone = (synthVars.nOctave * 12) + n;
+					if (nSemiTone >= 12 * 9) nSemiTone = 12 * 9 - 1;
+					//double dFrequency = C_SHARP_0 * pow(2, nSemiTone / 12.0);
+					dOutputs[i] += synthVars.osc[i].Play(dNotes[nSemiTone], d, channel);
+				}					
+			}
+		}
 	}
 
 	//Check Routing Matrix
@@ -557,7 +650,7 @@ double synthFunction(double d, byte channel)
 			{
 				if (routingMatrix[m][i])
 				{
-					synthVars.osc[deviceMap[i]].AddFM(0.75 * synthVars.osc[deviceMap[i]].GetFrequency() * synthVars.osc[m].Play(synthVars.osc[m].GetFrequency(), d, channel));
+					synthVars.osc[deviceMap[i]].AddFM(0.25 * synthVars.osc[deviceMap[i]].GetFrequency() * synthVars.osc[m].Play(synthVars.osc[m].GetFrequency(), d, channel));
 				}
 
 			}
