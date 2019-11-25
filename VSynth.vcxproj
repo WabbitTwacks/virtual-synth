@@ -127,6 +127,7 @@
   <ItemGroup>
     <ClCompile Include="AudioInterface.cpp" />
     <ClCompile Include="CfgWindow.cpp" />
+    <ClCompile Include="Envelope.cpp" />
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="Oscillator.cpp" />
   </ItemGroup>
@@ -136,6 +137,7 @@
   <ItemGroup>
     <ClInclude Include="AudioInterface.h" />
     <ClInclude Include="CfgWindow.h" />
+    <ClInclude Include="Envelope.h" />
     <ClInclude Include="Helpers.h" />
     <ClInclude Include="Oscillator.h" />
   </ItemGroup>

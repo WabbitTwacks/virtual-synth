@@ -11,13 +11,14 @@
 #include "AudioInterface.h"
 #include "CfgWindow.h"
 #include "Oscillator.h"
+#include "Envelope.h"
 
 #define C_SHARP_0 16.35
 
 #define APP_WIDTH 800
 #define APP_HEIGHT 600
 
-#define INIT_MASTER_VOLUME 10
+#define INIT_MASTER_VOLUME 45
 
 #define LFO_MIN 0.001
 #define LFO_MAX 20.00
@@ -45,11 +46,6 @@
 
 #define R_NUM_ROUTES 8
 
-//route input to device mapping
-const uint8_t deviceMap[6] = {0, 0, 1, 1, 2, 2};
-
-double dNotes[12 * 9];
-
 const wxString VERSION = "1.00";
 
 using namespace std;
@@ -59,8 +55,16 @@ struct SynthVars
 	unsigned int nMasterVolume = INIT_MASTER_VOLUME;
 
 	Oscillator osc[3];
+	Envelope ADSR;
 
-	bool bKeyDown[16];
+	//route input to device mapping
+	const uint8_t deviceMap[6] = { 0, 0, 1, 1, 2, 2 };
+
+	double dNotes[12 * 9];
+
+	vector<uint8_t> vNotesOn;
+	uint16_t bKeyDown = 0;
+	uint8_t numKeysDown = 0;
 	int8_t nOctave = 3;
 
 	bool octaveKeyDownState = false;
@@ -153,8 +157,6 @@ wxIMPLEMENT_APP(MyApp);
 
 bool MyApp::OnInit()
 {
-	ZeroMemory(synthVars.bKeyDown, 16);
-
 	vector<string> devices = AudioInterface::GetDevices();
 
 	audioIF = new AudioInterface(devices[0], 44100, 2, 8, 512); //use first device in list
@@ -177,7 +179,7 @@ bool MyApp::OnInit()
 
 	//generate all note frequency values for lookup
 	for (int i = 0; i < 12 * 9; i++)
-		dNotes[i] = C_SHARP_0 * pow(2, i / 12.0);
+		synthVars.dNotes[i] = C_SHARP_0 * pow(2, i / 12.0);
 
 	MyFrame *frame = new MyFrame();
 	frame->SetSize({ APP_WIDTH, APP_HEIGHT });
@@ -195,11 +197,24 @@ int MyApp::FilterEvent(wxEvent & event)
 	{
 		for (int i = 0; i < 16; i++)
 		{
-			if (((wxKeyEvent&)event).GetUnicodeKey() == L"AWSEDFTGYHUJKOLP"[i])
+			if (((wxKeyEvent&)event).GetUnicodeKey() == L"AWSEDFTGYHUJKOLP"[i] && !(synthVars.bKeyDown & (1<<i)))
 			{
 				pFrame->SetFocus();
 
-				synthVars.bKeyDown[i] = true;
+				if (synthVars.numKeysDown == 0)
+				{
+					synthVars.vNotesOn.clear();
+
+					synthVars.ADSR.StartEnvelope();
+				}					
+
+				synthVars.bKeyDown |= (1<<i);
+
+				uint8_t nNote = synthVars.nOctave * 12 + i;
+				if (std::find(synthVars.vNotesOn.begin(), synthVars.vNotesOn.end(), nNote) == synthVars.vNotesOn.end())
+					synthVars.vNotesOn.push_back(nNote);
+
+				synthVars.numKeysDown++;
 
 				return false;
 			}
@@ -231,7 +246,12 @@ int MyApp::FilterEvent(wxEvent & event)
 			{
 				pFrame->SetFocus();
 
-				synthVars.bKeyDown[i] = false;
+				synthVars.bKeyDown ^= (1<<i);
+
+				synthVars.numKeysDown--;
+
+				if (synthVars.numKeysDown == 0)
+					synthVars.ADSR.StopEnvelope();
 
 				return false;
 			}
@@ -558,11 +578,15 @@ void MyFrame::OnOscLFO(wxCommandEvent & event)
 
 			if (cb->GetValue()) //LFO scaling on
 			{
-				freqEditOsc[1]->SetValue(wxString::Format("%.2f", freqOsc[1]->GetValue() * LFO_MAX/1000.0));
+				double fFreq = freqOsc[1]->GetValue() * LFO_MAX / 1000.0;
+				freqEditOsc[1]->SetValue(wxString::Format("%.2f", fFreq));
+				synthVars.osc[1].SetFrequency(fFreq);
 			}
 			else //LFO scaling off
 			{
-				freqEditOsc[1]->SetValue(wxString::Format("%.2f", LinToLog(freqOsc[1]->GetValue(), 1.0, 1000.0, FREQ_MIN, FREQ_MAX)));
+				double fFreq = LinToLog(freqOsc[1]->GetValue(), 1.0, 1000.0, FREQ_MIN, FREQ_MAX);
+				freqEditOsc[1]->SetValue(wxString::Format("%.2f", fFreq));
+				synthVars.osc[1].SetFrequency(fFreq);
 			}
 		}
 	}
@@ -615,6 +639,8 @@ MyFrame::~MyFrame()
 double synthFunction(double d, byte channel)
 {
 	double dOutputs[R_NUM_DEVS] = { 0.0, 0.0, 0.0, 0.0, 0.0 };
+
+	const uint8_t *deviceMap = synthVars.deviceMap;
 	 
 
 	//Generate outputs from oscillators
@@ -626,15 +652,12 @@ double synthFunction(double d, byte channel)
 		}
 		else
 		{
-			for (int n = 0; n < 16; n++)
+			for (auto note : synthVars.vNotesOn)
 			{
-				if (synthVars.bKeyDown[n])
-				{
-					uint8_t nSemiTone = ((synthVars.nOctave + synthVars.osc[i].GetOctaveMod()) * 12) + n;
+					uint8_t nSemiTone = note + synthVars.osc[i].GetOctaveMod()*12;
 					if (nSemiTone >= 12 * 9 || nSemiTone < 0) continue;
 					//double dFrequency = C_SHARP_0 * pow(2, nSemiTone / 12.0);
-					dOutputs[i] += synthVars.osc[i].Play(dNotes[nSemiTone], d, channel);
-				}					
+					dOutputs[i] += synthVars.ADSR.GetAmplitude() * synthVars.osc[i].Play(synthVars.dNotes[nSemiTone], d, channel);				
 			}
 		}
 	}
@@ -669,7 +692,7 @@ double synthFunction(double d, byte channel)
 			{
 				if (routingMatrix[m][i])
 				{
-					double dAM = 0.5 * (synthVars.osc[m].Play(synthVars.osc[m].GetFrequency(), d, channel) + synthVars.osc[m].GetVolume());
+					double dAM = synthVars.osc[m].Play(synthVars.osc[m].GetFrequency(), d, channel) + 0.5*synthVars.osc[m].GetVolume();
 					synthVars.osc[deviceMap[i]].AddAM(1.0 - dAM);
 				}
 			}
@@ -689,5 +712,5 @@ double synthFunction(double d, byte channel)
 		}
 	}
 	
-	return dOutputs[R_MIXR] * (synthVars.nMasterVolume / 100.0);
+	return dOutputs[R_MIXR] * 0.5 * (synthVars.nMasterVolume / 100.0);
 }
