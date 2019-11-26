@@ -4,10 +4,10 @@
 
 struct EnvelopeParameters
 {
-	double dAttack = 2.0;
+	double dAttack = 1.0;
 	double dDecay = 10.0;
-	double dSustain = 0.0;
-	double dRelease = 1000.0;
+	double dSustain = 0.8;
+	double dRelease = 100.0;
 };
 
 class Envelope

@@ -6,12 +6,15 @@
 
 #include <algorithm>
 #include <cmath>
+#include <deque>
 
 #include "Helpers.h"
 #include "AudioInterface.h"
 #include "CfgWindow.h"
 #include "Oscillator.h"
 #include "Envelope.h"
+
+#define AVERAGE_SAMPLES 441
 
 #define C_SHARP_0 16.35
 
@@ -69,6 +72,8 @@ struct SynthVars
 
 	bool octaveKeyDownState = false;
 
+	deque<double> dCurrentOutput;
+
 	wxString debug = "Debug: ";
 
 } synthVars;
@@ -100,6 +105,12 @@ public:
 
 	wxButton *CfgButton;
 	wxSlider *masterVSlider;
+	wxGauge *masterVLevel;
+	wxPanel *masterVBack;
+	wxPanel *masterVPanel;
+	wxBitmap *masterUVLevel;
+
+	wxTimer *masterLevelTimer;
 
 	wxPanel *oscPanel[3];
 
@@ -118,6 +129,7 @@ private:
 	void OnAbout(wxCommandEvent& event);
 	void OnConfig(wxCommandEvent& event);
 	void OnMaster(wxCommandEvent& event);
+	void OnMasterGauge(wxTimerEvent& event);
 
 	void OnOscWave(wxCommandEvent& event);
 
@@ -128,6 +140,8 @@ private:
 	void OnOscDrone(wxCommandEvent& event);
 	void OnOscRouting(wxCommandEvent& event);
 	void OnOscLFO(wxCommandEvent& event);
+
+	void OnPaint(wxPaintEvent &event);
 };
 
 enum
@@ -135,6 +149,8 @@ enum
 	ID_Hello = 1,
 	ID_Cfg,
 	ID_Master,
+	ID_MasterLevel,
+	ID_MasterLevelTimer,
 	ID_Pan1,
 	ID_Pan2,
 	ID_Wave1,
@@ -307,10 +323,20 @@ MyFrame::MyFrame()
 	CfgButton->SetBitmap(*CfgBitmap);
 
 	//Master Volume Slider
-	masterVSlider = new wxSlider(mainPanel, ID_Master, 100 - INIT_MASTER_VOLUME, 0, 100, { APP_WIDTH - 64, 64 }, wxDefaultSize, wxSL_VERTICAL);
+	masterVSlider = new wxSlider(mainPanel, ID_Master, 100 - INIT_MASTER_VOLUME, 0, 100, { APP_WIDTH - 100, 64 }, wxDefaultSize, wxSL_VERTICAL);
+	
+	masterVBack = new wxPanel(mainPanel, wxID_ANY, { APP_WIDTH - 64, 64 }, { 16, 100 }, wxSIMPLE_BORDER);
+	/*masterVPanel = new wxPanel(mainPanel, wxID_ANY, { APP_WIDTH - 62, 66 }, { 12, 96 });
+	masterVPanel->SetBackgroundColour(wxColor(0x33ff33));*/
+
+	//masterVLevel = new wxGauge(mainPanel, ID_MasterLevel, 100, { APP_WIDTH - 64, 64 }, { wxDefaultSize.GetX(), 100 }, wxGA_VERTICAL);
+	masterLevelTimer = new wxTimer(this, ID_MasterLevelTimer);
+	Bind(wxEVT_TIMER, &MyFrame::OnMasterGauge, this, wxID_ANY);
+	masterLevelTimer->Start(100);
 
 	Bind(wxEVT_BUTTON, &MyFrame::OnConfig, this, ID_Cfg);
 	Bind(wxEVT_SLIDER, &MyFrame::OnMaster, this, ID_Master);
+
 
 	//oscillator panels
 	for (int i = 0; i < 3; i++)
@@ -405,6 +431,39 @@ void MyFrame::OnMaster(wxCommandEvent & event)
 		SetStatusText(wxString::Format("Master Volume: %d", synthVars.nMasterVolume));
 	}
 	SetFocus();
+}
+
+void MyFrame::OnMasterGauge(wxTimerEvent & event)
+{
+	if (synthVars.dCurrentOutput.size() < AVERAGE_SAMPLES)
+		return;
+
+	//calculate RMS for Output Signal
+	double dRMSVolume = 0.0;
+
+	for (auto i : synthVars.dCurrentOutput)
+	{
+		dRMSVolume += i*i;
+	}
+
+	dRMSVolume /= (double)AVERAGE_SAMPLES;
+	dRMSVolume = sqrt(dRMSVolume);
+
+	//SetStatusText(wxString::Format("RMS: %.2f", dRMSVolume));
+
+	double dB = (dRMSVolume > 0.0) ? 10 * log10(dRMSVolume / 1.0) : -100000000.0;
+
+	SetStatusText(wxString::Format("dB: %.2f", dB));
+
+	double dMinDB = 10 * log10(0.000001 / 1.0);
+	double dMaxDB = 0.0;
+
+	wxClientDC dc((wxFrame*)masterVBack);
+	dc.SetBackground({wxColor(0x555555)});
+	dc.Clear();
+	dc.SetBrush({wxColor(0x33ff33)});
+	dc.SetPen(*wxTRANSPARENT_PEN);
+	dc.DrawRectangle(13, 97, -12, -(int)((dB - dMinDB) * 100.0/(dMaxDB - dMinDB)));
 }
 
 void MyFrame::OnOscWave(wxCommandEvent & event)
@@ -593,6 +652,11 @@ void MyFrame::OnOscLFO(wxCommandEvent & event)
 	SetFocus();
 }
 
+void MyFrame::OnPaint(wxPaintEvent & event)
+{
+	wxPaintDC(this);
+}
+
 void MyFrame::OnOscFreqEdit(wxCommandEvent & event)
 {
 	wxTextCtrl *tx = dynamic_cast<wxTextCtrl*>(event.GetEventObject());
@@ -692,7 +756,7 @@ double synthFunction(double d, byte channel)
 			{
 				if (routingMatrix[m][i])
 				{
-					double dAM = synthVars.osc[m].Play(synthVars.osc[m].GetFrequency(), d, channel) + 0.5*synthVars.osc[m].GetVolume();
+					double dAM = synthVars.osc[m].Play(synthVars.osc[m].GetFrequency(), d, channel) + 0.1*synthVars.osc[m].GetVolume();
 					synthVars.osc[deviceMap[i]].AddAM(1.0 - dAM);
 				}
 			}
@@ -711,6 +775,12 @@ double synthFunction(double d, byte channel)
 				dOutputs[R_MIXR] += routingMatrix[j][R_MIXR_A] ? dOutputs[j] : 0.0;
 		}
 	}
+
+	double dOut = dOutputs[R_MIXR] * 0.5 * (synthVars.nMasterVolume / 100.0);
+
+	synthVars.dCurrentOutput.push_front(dOut);
+	if (synthVars.dCurrentOutput.size() > AVERAGE_SAMPLES)
+		synthVars.dCurrentOutput.pop_back();
 	
-	return dOutputs[R_MIXR] * 0.5 * (synthVars.nMasterVolume / 100.0);
+	return dOut;
 }
