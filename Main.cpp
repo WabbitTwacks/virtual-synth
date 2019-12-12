@@ -13,6 +13,7 @@
 #include "CfgWindow.h"
 #include "Oscillator.h"
 #include "Envelope.h"
+#include "MiscDSP.h"
 
 #define AVERAGE_SAMPLES 441
 
@@ -74,6 +75,8 @@ struct SynthVars
 
 	deque<double> dCurrentOutput;
 
+	bool bFilter = false;
+
 	wxString debug = "Debug: ";
 
 } synthVars;
@@ -81,6 +84,7 @@ struct SynthVars
 bool routingMatrix[R_NUM_DEVS - 1][R_NUM_ROUTES];
 
 double synthFunction(double, byte);
+double SimpleLowPass(double currentSample);
 
 class MyFrame;
 
@@ -265,6 +269,11 @@ int MyApp::FilterEvent(wxEvent & event)
 
 			if (synthVars.nOctave > 7)
 				synthVars.nOctave = 7;
+		}
+
+		if (((wxKeyEvent&)event).GetUnicodeKey() == ' ')
+		{
+			synthVars.bFilter = !synthVars.bFilter;
 		}
 	
 	}
@@ -907,9 +916,16 @@ double synthFunction(double d, byte channel)
 
 	double dOut = dOutputs[R_MIXR] * 0.5 * (synthVars.nMasterVolume / 100.0);
 
-	synthVars.dCurrentOutput.push_front(dOut);
-	if (synthVars.dCurrentOutput.size() > AVERAGE_SAMPLES)
-		synthVars.dCurrentOutput.pop_back();
+	//test filtering using a simple delay of 1 or few samples
+	if (synthVars.bFilter)
+		dOut = SimpleBandPass(dOut);
+
+	if (channel == 0)
+	{
+		synthVars.dCurrentOutput.push_front(dOut);
+		if (synthVars.dCurrentOutput.size() > AVERAGE_SAMPLES)
+			synthVars.dCurrentOutput.pop_back();
+	}	
 	
 	return dOut;
 }

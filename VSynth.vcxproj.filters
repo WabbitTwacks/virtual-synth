@@ -52,5 +52,8 @@
     <ClInclude Include="Envelope.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="MiscDSP.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
