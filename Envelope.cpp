@@ -29,6 +29,26 @@ void Envelope::SetRelease(double dRelease)
 	parameters.dRelease = dRelease;
 }
 
+double Envelope::GetAttack()
+{
+	return parameters.dAttack;
+}
+
+double Envelope::GetDecay()
+{
+	return parameters.dDecay;
+}
+
+double Envelope::GetSustain()
+{
+	return parameters.dSustain;
+}
+
+double Envelope::GetRelease()
+{
+	return parameters.dRelease;
+}
+
 double Envelope::GetAmplitude()
 {
 	if (!bActive)

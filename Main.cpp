@@ -119,9 +119,12 @@ public:
 	wxSlider *volOsc[3];
 	wxTextCtrl *freqEditOsc[3];
 	wxSlider *freqOsc[3];
+	wxTextCtrl *freqFine[3];
 	wxCheckBox *checkDrone[3];
 	wxChoice *choiceOscRouting[3];
 	wxCheckBox *checkLFO[3];
+	wxRadioBox *octRadioBox[3];
+
 
 private:
 	void OnHello(wxCommandEvent& event);
@@ -140,6 +143,9 @@ private:
 	void OnOscDrone(wxCommandEvent& event);
 	void OnOscRouting(wxCommandEvent& event);
 	void OnOscLFO(wxCommandEvent& event);
+	void OnFreqFine(wxCommandEvent& event);
+	void OnOctaveSelect(wxCommandEvent& event);
+	void OnEnvelope(wxCommandEvent& event);
 
 	void OnPaint(wxPaintEvent &event);
 };
@@ -159,6 +165,8 @@ enum
 	ID_Vol2,
 	ID_Freq1,
 	ID_Freq2,
+	ID_Fine1,
+	ID_Fine2,
 	ID_Drone1,
 	ID_Drone2,
 	ID_FreqEdit1,
@@ -166,7 +174,13 @@ enum
 	ID_OscRouting1,
 	ID_OscRouting2,
 	ID_OscLFO1,
-	ID_OscLFO2
+	ID_OscLFO2,
+	ID_OctSel1,
+	ID_OctSel2,
+	ID_Att1,
+	ID_Dec1,
+	ID_Sus1,
+	ID_Rel1
 };
 
 wxIMPLEMENT_APP(MyApp);
@@ -191,7 +205,7 @@ bool MyApp::OnInit()
 
 	//synthVars.osc[1].SetLFO(true);
 	//synthVars.osc[1].SetFrequency(1.0);
-	synthVars.osc[1].SetOctave(-1);
+	//synthVars.osc[1].SetOctave(-1);
 
 	//generate all note frequency values for lookup
 	for (int i = 0; i < 12 * 9; i++)
@@ -219,10 +233,10 @@ int MyApp::FilterEvent(wxEvent & event)
 
 				if (synthVars.numKeysDown == 0)
 				{
-					synthVars.vNotesOn.clear();
+					synthVars.vNotesOn.clear();					
+				}	
 
-					synthVars.ADSR.StartEnvelope();
-				}					
+				synthVars.ADSR.StartEnvelope();
 
 				synthVars.bKeyDown |= (1<<i);
 
@@ -317,14 +331,14 @@ MyFrame::MyFrame()
 	CfgButton = new wxButton(mainPanel, ID_Cfg);
 	CfgButton->SetSize(32, 32);
 	wxSize size(this->GetSize());
-	SetStatusText(wxString::Format("%d, %d",size.GetWidth(), size.GetHeight()));
+	SetStatusText(wxString::Format("%d, %d", size.GetWidth(), size.GetHeight()));
 	CfgButton->SetPosition({ (APP_WIDTH - 64), 0 });
 	wxBitmap *CfgBitmap = new wxBitmap("cfg_button.bmp", wxBITMAP_TYPE_BMP);
 	CfgButton->SetBitmap(*CfgBitmap);
 
 	//Master Volume Slider
 	masterVSlider = new wxSlider(mainPanel, ID_Master, 100 - INIT_MASTER_VOLUME, 0, 100, { APP_WIDTH - 100, 64 }, wxDefaultSize, wxSL_VERTICAL);
-	
+
 	masterVBack = new wxPanel(mainPanel, wxID_ANY, { APP_WIDTH - 64, 64 }, { 16, 100 }, wxSIMPLE_BORDER);
 	/*masterVPanel = new wxPanel(mainPanel, wxID_ANY, { APP_WIDTH - 62, 66 }, { 12, 96 });
 	masterVPanel->SetBackgroundColour(wxColor(0x33ff33));*/
@@ -341,32 +355,50 @@ MyFrame::MyFrame()
 	//oscillator panels
 	for (int i = 0; i < 3; i++)
 	{
-		oscPanel[i] = new wxPanel(mainPanel, wxID_ANY, { 12, 6 + i*150 }, { 300, 150 }, wxSIMPLE_BORDER);
+		oscPanel[i] = new wxPanel(mainPanel, wxID_ANY, { 12, 6 + i * 150 }, { 300, 150 }, wxSIMPLE_BORDER);
 	}
 
-	choiceOscWave[0] = new wxChoice(oscPanel[0], ID_Wave1, { 6, 6}, wxDefaultSize);
+	choiceOscWave[0] = new wxChoice(oscPanel[0], ID_Wave1, { 6, 6 }, wxDefaultSize);
 	choiceOscWave[0]->Append(vector<wxString>({ "Sine", "Square", "Saw", "Triangle", "Noise" }));
 	choiceOscWave[0]->SetSelection(0);
 	Bind(wxEVT_CHOICE, &MyFrame::OnOscWave, this, ID_Wave1);
 
-	panOscChannel[0] = new wxSlider(oscPanel[0], ID_Pan1, 0, -100, 100, { 128,  6 }, wxDefaultSize, wxSL_BOTTOM);
+	panOscChannel[0] = new wxSlider(oscPanel[0], ID_Pan1, 0, -100, 100, { 114,  6 }, wxDefaultSize, wxSL_BOTTOM);
 	Bind(wxEVT_SLIDER, &MyFrame::OnOscPan, this, ID_Pan1);
+	wxStaticText *panLabel = new wxStaticText(oscPanel[0], wxID_ANY, "Pan", { 155, 28 });
 
-	volOsc[0] = new wxSlider(oscPanel[0], ID_Vol1, 100 - (synthVars.osc[0].GetVolume() * 100), 0, 100, { 250, 6 }, wxDefaultSize, wxSL_VERTICAL);
+	volOsc[0] = new wxSlider(oscPanel[0], ID_Vol1, 100 - (synthVars.osc[0].GetVolume() * 100), 0, 100, { 270, 6 }, wxDefaultSize, wxSL_VERTICAL);
 	Bind(wxEVT_SLIDER, &MyFrame::OnOscVol, this, ID_Vol1);
 
 	freqEditOsc[0] = new wxTextCtrl(oscPanel[0], ID_FreqEdit1, wxString::Format("%.2f", synthVars.osc[0].GetFrequency()), { 6, 50 }, { 50, wxDefaultSize.GetY() }, wxTE_CENTRE | wxTE_PROCESS_ENTER);
 	Bind(wxEVT_COMMAND_TEXT_ENTER, &MyFrame::OnOscFreqEdit, this, ID_FreqEdit1);
-	
+
 
 	freqOsc[0] = new wxSlider(oscPanel[0], ID_Freq1, (int)LogToLin(synthVars.osc[0].GetFrequency(), FREQ_MIN, FREQ_MAX, 1.0, 1000.0), 1, 1000, { 6, 74 });
 	if (synthVars.osc[0].IsLFO())
 		freqOsc[0]->SetValue((int)synthVars.osc[0].GetFrequency() *  1000.0 / LFO_MAX);
 	Bind(wxEVT_SLIDER, &MyFrame::OnOscFreq, this, ID_Freq1);
+	wxStaticText *freqLabel = new wxStaticText(oscPanel[0], wxID_ANY, "Frequency", { 6, 94 });
+
+	freqFine[0] = new wxTextCtrl(oscPanel[0], ID_Fine1, wxString::Format("%d", synthVars.osc[0].GetFineTune()), { 120, 74 }, { 40, wxDefaultSize.GetY() }, wxTE_CENTRE | wxTE_PROCESS_ENTER);
+	Bind(wxEVT_COMMAND_TEXT_ENTER, &MyFrame::OnFreqFine, this, ID_Fine1);
+	wxStaticText *fineLabel = new wxStaticText(oscPanel[0], wxID_ANY, "Fine", { 120, 100 });
 
 	checkDrone[0] = new wxCheckBox(oscPanel[0], ID_Drone1, "Drone", { 6, 32 });
 	checkDrone[0]->SetValue(synthVars.osc[0].GetDrone());
 	Bind(wxEVT_CHECKBOX, &MyFrame::OnOscDrone, this, ID_Drone1);
+
+	//radio buttons for octave selection
+	wxArrayString octaveOptions;
+	octaveOptions.Add("+2");
+	octaveOptions.Add("+1");
+	octaveOptions.Add("+0");
+	octaveOptions.Add("-1");
+	octaveOptions.Add("-2");
+
+	octRadioBox[0] = new wxRadioBox(oscPanel[0], ID_OctSel1, "Octave", { 214, 6 }, wxDefaultSize, octaveOptions, 1, wxRA_SPECIFY_COLS);
+	octRadioBox[0]->SetSelection(synthVars.osc[0].GetOctaveMod() + 2);
+	Bind(wxEVT_RADIOBOX, &MyFrame::OnOctaveSelect, this, ID_OctSel1);
 
 	//------
 
@@ -375,10 +407,11 @@ MyFrame::MyFrame()
 	choiceOscWave[1]->SetSelection(0);
 	Bind(wxEVT_CHOICE, &MyFrame::OnOscWave, this, ID_Wave2);
 
-	panOscChannel[1] = new wxSlider(oscPanel[1], ID_Pan2, 0, -100, 100, { 128, 6 }, wxDefaultSize, wxSL_BOTTOM);
+	panOscChannel[1] = new wxSlider(oscPanel[1], ID_Pan2, 0, -100, 100, { 114, 6 }, wxDefaultSize, wxSL_BOTTOM);
 	Bind(wxEVT_SLIDER, &MyFrame::OnOscPan, this, ID_Pan2);
+	wxStaticText *panLabel2 = new wxStaticText(oscPanel[1], wxID_ANY, "Pan", { 155, 28 });
 
-	volOsc[1] = new wxSlider(oscPanel[1], ID_Vol2, 100 - (synthVars.osc[1].GetVolume() * 100), 0, 100, { 250, 6 }, wxDefaultSize, wxSL_VERTICAL);
+	volOsc[1] = new wxSlider(oscPanel[1], ID_Vol2, 100 - (synthVars.osc[1].GetVolume() * 100), 0, 100, { 270, 6 }, wxDefaultSize, wxSL_VERTICAL);
 	Bind(wxEVT_SLIDER, &MyFrame::OnOscVol, this, ID_Vol2);
 
 	freqEditOsc[1] = new wxTextCtrl(oscPanel[1], ID_FreqEdit2, wxString::Format("%.2f", synthVars.osc[1].GetFrequency()), { 6, 50 }, { 50, wxDefaultSize.GetY() }, wxTE_CENTRE | wxTE_PROCESS_ENTER);
@@ -388,6 +421,11 @@ MyFrame::MyFrame()
 	if (synthVars.osc[1].IsLFO())
 		freqOsc[1]->SetValue((int)synthVars.osc[1].GetFrequency() * 1000.0 / LFO_MAX);
 	Bind(wxEVT_SLIDER, &MyFrame::OnOscFreq, this, ID_Freq2);
+	wxStaticText *freqLabel2 = new wxStaticText(oscPanel[1], wxID_ANY, "Frequency", { 6, 94 });
+
+	freqFine[1] = new wxTextCtrl(oscPanel[1], ID_Fine2, wxString::Format("%d", synthVars.osc[1].GetFineTune()), { 120, 74 }, { 40, wxDefaultSize.GetY() }, wxTE_CENTRE | wxTE_PROCESS_ENTER);
+	Bind(wxEVT_COMMAND_TEXT_ENTER, &MyFrame::OnFreqFine, this, ID_Fine2);
+	wxStaticText *fineLabel2 = new wxStaticText(oscPanel[1], wxID_ANY, "Fine", { 120, 100 });
 
 	checkDrone[1] = new wxCheckBox(oscPanel[1], ID_Drone2, "Drone", { 6, 32 });
 	checkDrone[1]->SetValue(synthVars.osc[1].GetDrone());
@@ -402,6 +440,28 @@ MyFrame::MyFrame()
 	checkLFO[1]->SetValue(synthVars.osc[1].IsLFO());
 	Bind(wxEVT_CHECKBOX, &MyFrame::OnOscLFO, this, ID_OscLFO2);
 
+	octRadioBox[1] = new wxRadioBox(oscPanel[1], ID_OctSel2, "Octave", { 214, 6 }, wxDefaultSize, octaveOptions, 1, wxRA_SPECIFY_COLS);
+	octRadioBox[1]->SetSelection(synthVars.osc[1].GetOctaveMod() + 2);
+	Bind(wxEVT_RADIOBOX, &MyFrame::OnOctaveSelect, this, ID_OctSel2);
+
+	//envelope
+	wxPanel *envPanel = new wxPanel(mainPanel, wxID_ANY, { 320, 6 }, { 175, 150 }, wxSIMPLE_BORDER);
+
+	wxSlider *attSlider = new wxSlider(envPanel, ID_Att1, 1000 - synthVars.ADSR.GetAttack(), 0, 1000, { 6, 6 }, wxDefaultSize, wxSL_VERTICAL);
+	Bind(wxEVT_SLIDER, &MyFrame::OnEnvelope, this, ID_Att1);
+	wxStaticText *attLabel = new wxStaticText(envPanel, wxID_ANY, "A", { 14, 106 });
+
+	wxSlider *decSlider = new wxSlider(envPanel, ID_Dec1, 500 - synthVars.ADSR.GetDecay() * 10, 0, 500, { 30, 6 }, wxDefaultSize, wxSL_VERTICAL);
+	Bind(wxEVT_SLIDER, &MyFrame::OnEnvelope, this, ID_Dec1);
+	wxStaticText *decLabel = new wxStaticText(envPanel, wxID_ANY, "D", { 38, 106 });
+
+	wxSlider *susSlider = new wxSlider(envPanel, ID_Sus1, 100 - (int)(synthVars.ADSR.GetSustain()*100.0), 0, 100, { 54, 6 }, wxDefaultSize, wxSL_VERTICAL);
+	Bind(wxEVT_SLIDER, &MyFrame::OnEnvelope, this, ID_Sus1);
+	wxStaticText *susLabel = new wxStaticText(envPanel, wxID_ANY, "S", { 62, 106 });
+
+	wxSlider *relSlider = new wxSlider(envPanel, ID_Rel1,100 - (synthVars.ADSR.GetRelease()<=1000.0?(int)(synthVars.ADSR.GetRelease()*0.05):(int)(50 + (synthVars.ADSR.GetRelease()-1000.0)/(8999/49.0))), 0, 100, { 78, 6 }, wxDefaultSize, wxSL_VERTICAL);
+	Bind(wxEVT_SLIDER, &MyFrame::OnEnvelope, this, ID_Rel1);
+	wxStaticText *relLabel = new wxStaticText(envPanel, wxID_ANY, "R", { 86, 106 });
 }
 
 void MyFrame::OnExit(wxCommandEvent& event)
@@ -652,6 +712,75 @@ void MyFrame::OnOscLFO(wxCommandEvent & event)
 	SetFocus();
 }
 
+void MyFrame::OnFreqFine(wxCommandEvent & event)
+{
+	wxTextCtrl *tx = dynamic_cast<wxTextCtrl*>(event.GetEventObject());
+
+	if (tx)
+	{
+		long temp;
+		tx->GetValue().ToLong(&temp);
+		if (temp < -100)
+			temp = -100;
+		else if (temp > 100)
+			temp = 100;
+
+		tx->SetValue(wxString::Format("%d", temp));
+
+		int id = tx->GetId() - ID_Fine1;
+		if (id > 3 || id < 0)
+			return;		
+			
+		synthVars.osc[id].SetFineTune((int8_t)temp);		
+	}
+}
+
+void MyFrame::OnOctaveSelect(wxCommandEvent & event)
+{
+	wxRadioBox *rb = dynamic_cast<wxRadioBox*>(event.GetEventObject());
+
+	if (rb)
+	{
+		int id = rb->GetId() - ID_OctSel1;
+
+		synthVars.osc[id].SetOctave(2 - rb->GetSelection());
+	}
+
+	SetFocus();
+}
+
+void MyFrame::OnEnvelope(wxCommandEvent & event)
+{
+	wxSlider *s = dynamic_cast<wxSlider*>(event.GetEventObject());
+
+	if (s)
+	{
+		int sID = s->GetId();
+
+		if (sID == ID_Att1)
+		{
+			synthVars.ADSR.SetAttack(1000 - s->GetValue());
+		}
+		else if (sID == ID_Dec1)
+		{
+			synthVars.ADSR.SetDecay((1000 - s->GetValue()));
+		}
+		else if (sID == ID_Sus1)
+		{
+			synthVars.ADSR.SetSustain((100 - s->GetValue())/100.0);
+		}
+		else if (sID == ID_Rel1)
+		{
+			if (s->GetValue() >= 50)
+				synthVars.ADSR.SetRelease((100 - s->GetValue()) * 20.0);
+			else
+				synthVars.ADSR.SetRelease((51 - s->GetValue()) * 196.078);
+		}
+	}
+
+	SetFocus();
+}
+
 void MyFrame::OnPaint(wxPaintEvent & event)
 {
 	wxPaintDC(this);
@@ -691,7 +820,7 @@ void MyFrame::OnOscFreqEdit(wxCommandEvent & event)
 
 void MyFrame::OnHello(wxCommandEvent& event)
 {
-	wxLogMessage("Hello World Message!");
+	wxLogMessage("Hello!");
 }
 
 MyFrame::~MyFrame()

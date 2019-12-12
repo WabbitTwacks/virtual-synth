@@ -21,6 +21,11 @@ public:
 	void SetSustain(double dSustain);
 	void SetRelease(double dRelease);
 
+	double GetAttack();
+	double GetDecay();
+	double GetSustain();
+	double GetRelease();
+
 	double GetAmplitude();
 	void StartEnvelope();
 	void StopEnvelope();

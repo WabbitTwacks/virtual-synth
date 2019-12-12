@@ -47,6 +47,7 @@ void Oscillator::SetFrequency(double dFreq)
 
 void Oscillator::SetFineTune(int nCents)
 {
+	parameters.nFineTune = nCents;
 }
 
 void Oscillator::SetDrone(bool bDrone)
@@ -118,6 +119,11 @@ double Oscillator::GetFrequency()
 	return parameters.dFreq;
 }
 
+int8_t Oscillator::GetFineTune()
+{
+	return parameters.nFineTune;
+}
+
 bool Oscillator::GetDrone()
 {
 	return parameters.bDrone;
@@ -136,8 +142,9 @@ int8_t Oscillator::GetOctaveMod()
 double Oscillator::Play(double dFreq, double dTime, int8_t nChannel)
 {
 	double dOutput = 0.0;
+	double dHalfStep = dFreq * pow(2, 1 / 12.0) - dFreq;
 
-	dOutput = sin(dFreq * PI_R * dTime + parameters.dFM);
+	dOutput = sin((dFreq + dHalfStep * parameters.nFineTune/100.0) * PI_R * dTime + parameters.dFM);
 
 	switch (parameters.nWave)
 	{
@@ -158,7 +165,7 @@ double Oscillator::Play(double dFreq, double dTime, int8_t nChannel)
 		/*for (double n = 1.0; n < 100.0; n++) //too slow
 			dOutput += (-sin(n * dFreq * PI_R * dTime)) / n;*/
 
-		dOutput = (dFreq + parameters.dFM) * PI_R * fmod(dTime, 1.0 / (dFreq + parameters.dFM)) - (PI / 2.0);
+		dOutput = (dFreq + dHalfStep * parameters.nFineTune / 100.0 + parameters.dFM) * PI_R * fmod(dTime, 1.0 / (dFreq + dHalfStep * parameters.nFineTune / 100.0 + parameters.dFM)) - (PI / 2.0);
 
 		break;
 	case WAVE_TRI:

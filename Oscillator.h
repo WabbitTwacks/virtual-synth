@@ -23,7 +23,7 @@ struct oscParams
 	std::uint8_t nWave = WAVE_SINE;
 	double dVolume = 1.0;
 	double dChannelVolume[4] = { 1.0, 1.0, 1.0, 1.0 };
-	double dFineTune = 0.0;
+	int8_t nFineTune = 0.0; // in cents
 	double dFreq = 440.0;
 	int8_t nOctaveMod = 0;
 
@@ -60,6 +60,7 @@ public:
 	double GetVolume();
 	double GetChannelVolume(uint8_t nChannel);
 	double GetFrequency();
+	int8_t GetFineTune();
 	bool GetDrone();
 	bool IsLFO();
 	int8_t GetOctaveMod();
