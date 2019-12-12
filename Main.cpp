@@ -520,11 +520,11 @@ void MyFrame::OnMasterGauge(wxTimerEvent & event)
 
 	//SetStatusText(wxString::Format("RMS: %.2f", dRMSVolume));
 
-	double dB = (dRMSVolume > 0.0) ? 10 * log10(dRMSVolume / 1.0) : -100000000.0;
+	double dB = (dRMSVolume > 0.0) ? 20 * log10(dRMSVolume / 1.0) : -100000000.0;
 
 	SetStatusText(wxString::Format("dB: %.2f", dB));
 
-	double dMinDB = 10 * log10(0.000001 / 1.0);
+	double dMinDB = 20 * log10(0.001 / 1.0);
 	double dMaxDB = 0.0;
 
 	wxClientDC dc((wxFrame*)masterVBack);
@@ -532,7 +532,11 @@ void MyFrame::OnMasterGauge(wxTimerEvent & event)
 	dc.Clear();
 	dc.SetBrush({wxColor(0x33ff33)});
 	dc.SetPen(*wxTRANSPARENT_PEN);
-	dc.DrawRectangle(13, 97, -12, -(int)((dB - dMinDB) * 100.0/(dMaxDB - dMinDB)));
+	dc.DrawRectangle(13, 97, -12, -(int)((dB - dMinDB) * 97.0/(dMaxDB - dMinDB)));
+
+	int linePoint = 97 - (int)((-3 - dMinDB) * 97.0/(dMaxDB - dMinDB));
+	dc.SetPen({ wxColor(0x0000ff) });
+	dc.DrawLine({ 0, linePoint }, { 16, linePoint });
 }
 
 void MyFrame::OnOscWave(wxCommandEvent & event)
