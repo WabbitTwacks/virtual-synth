@@ -1,11 +1,15 @@
 #pragma once
 
+#include <cmath>
 #include <deque>
 
 double SimpleLowPass(double currentSample);
 double SimpleHighPass(double currentSample);
 double SimpleNotch(double currentSample);
 double SimpleBandPass(double currentSample);
+
+double SoftClip(double dInput, double dGain = 5.0);
+double BitCrush(double dInput, double dBits = 8.0);
 
 double SimpleLowPass(double currentSample)
 {
@@ -77,4 +81,16 @@ double SimpleBandPass(double currentSample)
 	channel %= 2;
 
 	return bandPassed * 0.5;
+}
+
+double SoftClip(double dInput, double dGain)
+{
+	return (2 / PI) * atan(dInput * dGain);
+}
+
+double BitCrush(double dInput, double dBits)
+{
+	double dScale = pow(2, dBits - 1.0);
+
+	return ceil(dInput * dScale) / dScale;
 }

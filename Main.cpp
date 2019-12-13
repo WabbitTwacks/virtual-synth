@@ -573,11 +573,15 @@ void MyFrame::OnOscPan(wxCommandEvent & event)
 	wxSlider *s = dynamic_cast<wxSlider*>(event.GetEventObject());
 
 	if (s)
-	{
-		//linear panning
+	{		
 		double pan[2];
+		//linear panning
 		pan[CH_RIGHT] = s->GetValue() / 200.0 + 0.5;
 		pan[CH_LEFT] = 1.0 - pan[CH_RIGHT];
+
+		//sine law panning
+		pan[CH_RIGHT] = sin(pan[CH_RIGHT] * PI/2.0);
+		pan[CH_LEFT] = sin(pan[CH_LEFT] * PI/2.0);
 
 
 		int id = s->GetId() - ID_Pan1;
@@ -923,6 +927,9 @@ double synthFunction(double d, byte channel)
 	}
 
 	double dOut = dOutputs[R_MIXR] * (synthVars.nMasterVolume / 100.0);
+
+	//quick distortion
+	/*dOut = BitCrush(dOut);*/
 
 	//test filtering using a simple delay of 1 or few samples
 	if (synthVars.bFilter)
