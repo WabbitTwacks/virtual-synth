@@ -933,8 +933,8 @@ double synthFunction(double d, byte channel)
 	if (synthVars.dCurrentOutput[channel].size() > AVERAGE_SAMPLES)
 		synthVars.dCurrentOutput[channel].pop_back();	
 
-	
-	synthVars.cvIsOutputProcessed.notify_one();
+	if (channel == CH_RIGHT) //let output data be available after both channels have been porcessed
+		synthVars.cvIsOutputProcessed.notify_one();
 	
 	return dOut;
 }
