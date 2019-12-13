@@ -7,6 +7,8 @@
 #include <algorithm>
 #include <cmath>
 #include <deque>
+#include <mutex>
+#include <condition_variable>
 
 #include "Helpers.h"
 #include "AudioInterface.h"
@@ -74,7 +76,9 @@ struct SynthVars
 
 	bool octaveKeyDownState = false;
 
-	deque<double> dCurrentOutput;
+	mutex muxRWOutput;
+	condition_variable cvIsOutputProcessed;
+	deque<double> dCurrentOutput[2];
 
 	bool bFilter = false;
 
@@ -505,23 +509,33 @@ void MyFrame::OnMaster(wxCommandEvent & event)
 
 void MyFrame::OnMasterGauge(wxTimerEvent & event)
 {
-	if (synthVars.dCurrentOutput.size() < AVERAGE_SAMPLES)
+	unique_lock<mutex> outputMutex(synthVars.muxRWOutput);
+	synthVars.cvIsOutputProcessed.wait(outputMutex);
+
+	if (synthVars.dCurrentOutput[CH_LEFT].size() < AVERAGE_SAMPLES ||
+		synthVars.dCurrentOutput[CH_RIGHT].size() < AVERAGE_SAMPLES)
 		return;
 
 	//calculate RMS for Output Signal
-	double dRMSVolume = 0.0;
+	double dRMSVolume[2] = { 0.0, 0.0 };
 
-	for (auto i : synthVars.dCurrentOutput)
+	for (int i = 0; i < AVERAGE_SAMPLES; i++)
 	{
-		dRMSVolume += i*i;
+		dRMSVolume[CH_LEFT] += synthVars.dCurrentOutput[CH_LEFT][i] * synthVars.dCurrentOutput[CH_LEFT][i];
+		dRMSVolume[CH_RIGHT] += synthVars.dCurrentOutput[CH_RIGHT][i] * synthVars.dCurrentOutput[CH_RIGHT][i];
 	}
 
-	dRMSVolume /= (double)AVERAGE_SAMPLES;
-	dRMSVolume = sqrt(dRMSVolume);
+	outputMutex.unlock();
+	synthVars.cvIsOutputProcessed.notify_one();
+
+	dRMSVolume[CH_LEFT] /= (double)AVERAGE_SAMPLES;
+	dRMSVolume[CH_RIGHT] /= (double)AVERAGE_SAMPLES;
+	dRMSVolume[CH_LEFT] = sqrt(dRMSVolume[CH_LEFT]);
+	dRMSVolume[CH_RIGHT] = sqrt(dRMSVolume[CH_RIGHT]);
 
 	//SetStatusText(wxString::Format("RMS: %.2f", dRMSVolume));
 
-	double dB = (dRMSVolume > 0.0) ? 20 * log10(dRMSVolume / 1.0) : -100000000.0;
+	double dB = (dRMSVolume[CH_LEFT] + dRMSVolume[CH_RIGHT] > 0.0) ? 20 * log10((dRMSVolume[CH_LEFT] + dRMSVolume[CH_RIGHT]) / 1.0) : -100000000.0;
 
 	SetStatusText(wxString::Format("dB: %.2f", dB));
 
@@ -560,29 +574,18 @@ void MyFrame::OnOscPan(wxCommandEvent & event)
 
 	if (s)
 	{
-		if (s->GetValue() < 2 && s->GetValue() > -2)
-		{
-			
-		}
-
+		//linear panning
 		double pan[2];
-		pan[0] = (double)min<int>(100 - s->GetValue(), 100)/100.0;
-		pan[1] = (double)min<int>(100 + s->GetValue(), 100)/100.0;
+		pan[CH_RIGHT] = s->GetValue() / 200.0 + 0.5;
+		pan[CH_LEFT] = 1.0 - pan[CH_RIGHT];
 
-		if (s->GetId() == ID_Pan1)
-		{
-			synthVars.osc[0].SetChannelVolume(CH_LEFT, pan[0]);
-			synthVars.osc[0].SetChannelVolume(CH_RIGHT, pan[1]);
 
-			SetStatusText(wxString::Format("Pan 1: %d", s->GetValue()));
-		}		
-		else if (s->GetId() == ID_Pan2)
-		{
-			synthVars.osc[1].SetChannelVolume(CH_LEFT, pan[0]);
-			synthVars.osc[1].SetChannelVolume(CH_RIGHT, pan[1]);
+		int id = s->GetId() - ID_Pan1;
 
-			SetStatusText(wxString::Format("Pan 2: %d", s->GetValue()));
-		}
+		synthVars.osc[id].SetChannelVolume(CH_LEFT, pan[CH_LEFT]);
+		synthVars.osc[id].SetChannelVolume(CH_RIGHT, pan[CH_RIGHT]);
+
+		SetStatusText(wxString::Format("Pan %d: %d",id+1, s->GetValue()));
 	}
 
 	SetFocus();
@@ -925,12 +928,13 @@ double synthFunction(double d, byte channel)
 	if (synthVars.bFilter)
 		dOut = SimpleBandPass(dOut);
 
-	if (channel == 0)
-	{
-		synthVars.dCurrentOutput.push_front(dOut);
-		if (synthVars.dCurrentOutput.size() > AVERAGE_SAMPLES)
-			synthVars.dCurrentOutput.pop_back();
-	}	
+	unique_lock<mutex> outputMutex(synthVars.muxRWOutput);
+	synthVars.dCurrentOutput[channel].push_front(dOut);
+	if (synthVars.dCurrentOutput[channel].size() > AVERAGE_SAMPLES)
+		synthVars.dCurrentOutput[channel].pop_back();	
+
+	
+	synthVars.cvIsOutputProcessed.notify_one();
 	
 	return dOut;
 }

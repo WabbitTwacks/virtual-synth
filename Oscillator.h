@@ -22,8 +22,8 @@ struct oscParams
 {
 	std::uint8_t nWave = WAVE_SINE;
 	double dVolume = 1.0;
-	double dChannelVolume[4] = { 1.0, 1.0, 1.0, 1.0 };
-	int8_t nFineTune = 0.0; // in cents
+	double dChannelVolume[4] = { 0.5, 0.5, 0.0, 0.0 };
+	int8_t nFineTune = 0; // in cents
 	double dFreq = 440.0;
 	int8_t nOctaveMod = 0;
 
