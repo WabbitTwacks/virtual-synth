@@ -929,11 +929,15 @@ double synthFunction(double d, byte channel)
 	double dOut = dOutputs[R_MIXR] * (synthVars.nMasterVolume / 100.0);
 
 	//quick distortion
-	/*dOut = BitCrush(dOut);*/
+	//dOut = BitCrush(SoftClip(dOut, 20.0, 10.0));
 
-	//test filtering using a simple delay of 1 or few samples
+	//test Bi-Quad LP filtering
 	if (synthVars.bFilter)
-		dOut = SimpleBandPass(dOut);
+	{
+		static double dDelayBuffer[2] = { 0.0, 0.0 };
+
+		dOut = BiQuadLowPass(dOut, dDelayBuffer, 1000.0, 1.0);
+	}
 
 	unique_lock<mutex> outputMutex(synthVars.muxRWOutput);
 	synthVars.dCurrentOutput[channel].push_front(dOut);
