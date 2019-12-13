@@ -182,7 +182,7 @@ double Oscillator::Play(double dFreq, double dTime, int8_t nChannel)
 		nChannel = -1;
 
 	if (nChannel == CH_MONO)
-		return dOutput * 0.1 * parameters.dAmplitude;
+		return dOutput * parameters.dAmplitude;
 	else
-		return dOutput * 0.1 * parameters.dChannelVolume[nChannel] * parameters.dAmplitude;
+		return dOutput * parameters.dChannelVolume[nChannel] * parameters.dAmplitude;
 }

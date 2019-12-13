@@ -22,7 +22,8 @@
 #define APP_WIDTH 800
 #define APP_HEIGHT 600
 
-#define INIT_MASTER_VOLUME 45
+#define INIT_MASTER_VOLUME 45 //45%
+#define OSC_VOLUME 0.125 //-18 dBFS
 
 #define LFO_MIN 0.001
 #define LFO_MAX 20.00
@@ -524,7 +525,7 @@ void MyFrame::OnMasterGauge(wxTimerEvent & event)
 
 	SetStatusText(wxString::Format("dB: %.2f", dB));
 
-	double dMinDB = 20 * log10(0.001 / 1.0);
+	double dMinDB = 20 * log10(0.001 / 1.0); //-60 dB
 	double dMaxDB = 0.0;
 
 	wxClientDC dc((wxFrame*)masterVBack);
@@ -854,7 +855,7 @@ double synthFunction(double d, byte channel)
 	{
 		if (synthVars.osc[i].GetDrone())
 		{
-			dOutputs[i] = synthVars.osc[i].Play(synthVars.osc[i].GetFrequency(), d, channel);
+			dOutputs[i] = OSC_VOLUME * synthVars.osc[i].Play(synthVars.osc[i].GetFrequency(), d, channel);
 		}
 		else
 		{
@@ -863,7 +864,7 @@ double synthFunction(double d, byte channel)
 					uint8_t nSemiTone = note + synthVars.osc[i].GetOctaveMod()*12;
 					if (nSemiTone >= 12 * 9 || nSemiTone < 0) continue;
 					//double dFrequency = C_SHARP_0 * pow(2, nSemiTone / 12.0);
-					dOutputs[i] += synthVars.ADSR.GetAmplitude() * synthVars.osc[i].Play(synthVars.dNotes[nSemiTone], d, channel);				
+					dOutputs[i] += synthVars.ADSR.GetAmplitude() * OSC_VOLUME * synthVars.osc[i].Play(synthVars.dNotes[nSemiTone], d, channel);
 			}
 		}
 	}
@@ -887,7 +888,7 @@ double synthFunction(double d, byte channel)
 
 			//regenerate outputs
 			if (synthVars.osc[deviceMap[i]].GetDrone())
-				dOutputs[deviceMap[i]] = synthVars.osc[deviceMap[i]].Play(synthVars.osc[deviceMap[i]].GetFrequency(), d, channel);
+				dOutputs[deviceMap[i]] = OSC_VOLUME * synthVars.osc[deviceMap[i]].Play(synthVars.osc[deviceMap[i]].GetFrequency(), d, channel);
 		}
 		else if (i == R_OSC1_A || i == R_OSC2_A || i == R_OSC3_A)
 		{
@@ -898,14 +899,14 @@ double synthFunction(double d, byte channel)
 			{
 				if (routingMatrix[m][i])
 				{
-					double dAM = synthVars.osc[m].Play(synthVars.osc[m].GetFrequency(), d, channel) + 0.1*synthVars.osc[m].GetVolume();
-					synthVars.osc[deviceMap[i]].AddAM(1.0 - dAM);
+					double dAM = synthVars.osc[m].Play(synthVars.osc[m].GetFrequency(), d, channel) + (1.0 - synthVars.osc[m].GetVolume());
+					synthVars.osc[deviceMap[i]].AddAM(dAM);
 				}
 			}
 
 			//regenerate outputs
 			if (synthVars.osc[deviceMap[i]].GetDrone())
-				dOutputs[deviceMap[i]] = synthVars.osc[deviceMap[i]].Play(synthVars.osc[deviceMap[i]].GetFrequency(), d, channel);
+				dOutputs[deviceMap[i]] = OSC_VOLUME * synthVars.osc[deviceMap[i]].Play(synthVars.osc[deviceMap[i]].GetFrequency(), d, channel);
 		}
 		else if (i == R_FLTR_C)
 		{
@@ -918,7 +919,7 @@ double synthFunction(double d, byte channel)
 		}
 	}
 
-	double dOut = dOutputs[R_MIXR] * 0.5 * (synthVars.nMasterVolume / 100.0);
+	double dOut = dOutputs[R_MIXR] * (synthVars.nMasterVolume / 100.0);
 
 	//test filtering using a simple delay of 1 or few samples
 	if (synthVars.bFilter)
