@@ -48,10 +48,11 @@
 #define R_OSC2_A 3
 #define R_OSC3_P 4
 #define R_OSC3_A 5
-#define R_FLTR_C 6
-#define R_MIXR_A 7
+#define R_FLTR_I 6
+#define R_FLTR_C 7
+#define R_MIXR_A 8
 
-#define R_NUM_ROUTES 8
+#define R_NUM_ROUTES 9
 
 const wxString VERSION = "1.00";
 
@@ -218,6 +219,7 @@ bool MyApp::OnInit()
 	ZeroMemory(routingMatrix, R_NUM_ROUTES * (R_NUM_DEVS-1));
 	routingMatrix[R_OSC1][R_MIXR_A] = true;
 	routingMatrix[R_OSC2][R_MIXR_A] = true;
+	routingMatrix[R_FLTR][R_MIXR_A] = true;
 
 	//synthVars.osc[1].SetLFO(true);
 	//synthVars.osc[1].SetFrequency(1.0);
@@ -421,6 +423,11 @@ MyFrame::MyFrame()
 	octRadioBox[0]->SetSelection(synthVars.osc[0].GetOctaveMod() + 2);
 	Bind(wxEVT_RADIOBOX, &MyFrame::OnOctaveSelect, this, ID_OctSel1);
 
+	choiceOscRouting[0] = new wxChoice(oscPanel[0], ID_OscRouting1, { 6, 120 });
+	choiceOscRouting[0]->Append(vector<wxString>({ "Mixer", "Osc1 Pitch", "Osc1 Amp", "Osc2 Pitch", "Osc2 Amp", "---", "---","Filter In" }));
+	choiceOscRouting[0]->SetSelection(0);
+	Bind(wxEVT_CHOICE, &MyFrame::OnOscRouting, this, ID_OscRouting1);
+
 	//------
 
 	choiceOscWave[1] = new wxChoice(oscPanel[1], ID_Wave2, { 6, 6 }, wxDefaultSize);
@@ -453,7 +460,7 @@ MyFrame::MyFrame()
 	Bind(wxEVT_CHECKBOX, &MyFrame::OnOscDrone, this, ID_Drone2);
 
 	choiceOscRouting[1] = new wxChoice(oscPanel[1], ID_OscRouting2, { 6, 120 });
-	choiceOscRouting[1]->Append(vector<wxString>({"Mixer", "Osc1 Pitch", "Osc1 Amp", "Osc2 Pitch", "Osc2 Amp"}));
+	choiceOscRouting[1]->Append(vector<wxString>({ "Mixer", "Osc1 Pitch", "Osc1 Amp", "Osc2 Pitch", "Osc2 Amp", "---", "---","Filter In" }));
 	choiceOscRouting[1]->SetSelection(0);
 	Bind(wxEVT_CHOICE, &MyFrame::OnOscRouting, this, ID_OscRouting2);
 
@@ -699,23 +706,20 @@ void MyFrame::OnOscRouting(wxCommandEvent & event)
 	
 	if (cb)
 	{
-		if (cb->GetId() == ID_OscRouting1)
-		{
-			ZeroMemory(routingMatrix[R_OSC1], R_NUM_ROUTES);
-		}
-		else if (cb->GetId() == ID_OscRouting2)
-		{
-			ZeroMemory(routingMatrix[R_OSC2], R_NUM_ROUTES);
+		int id = cb->GetId() - ID_OscRouting1;
 
-			if (cb->GetSelection() == 0) //Mixer
-			{
-				routingMatrix[R_OSC2][R_MIXR_A] = true;
-			}
-			else
-			{
-				routingMatrix[R_OSC2][cb->GetSelection() - 1] = true;
-			}
+		
+		ZeroMemory(routingMatrix[R_OSC1 + id], R_NUM_ROUTES);
+
+		if (cb->GetSelection() == 0) //Mixer
+		{
+			routingMatrix[R_OSC1 + id][R_MIXR_A] = true;
 		}
+		else
+		{
+			routingMatrix[R_OSC1 + id][cb->GetSelection() - 1] = true;
+		}
+		
 	}
 
 }
@@ -957,13 +961,24 @@ double synthFunction(double d, byte channel)
 			if (synthVars.osc[deviceMap[i]].GetDrone())
 				dOutputs[deviceMap[i]] = OSC_VOLUME * synthVars.osc[deviceMap[i]].Play(synthVars.osc[deviceMap[i]].GetFrequency(), d, channel);
 		}
-		else if (i == R_FLTR_C)
+		else if (i == R_FLTR_I) //Filter input
 		{
-			//do some filter magic here
+			for (int j = 0; j < 3; j++)
+			{
+				dOutputs[R_FLTR] += routingMatrix[j][R_FLTR_I] ? dOutputs[j] : 0.0;
+			}			
+		}
+		else if (i == R_FLTR_C) //Filter cutoff modulation
+		{
+			
+			//Apply Low Pass Filtering to signals going through filter	
+			static double dDelayBuffer[2][2] = { {0.0, 0.0}, {0.0, 0.0} };
+			/*dOut = BiQuadLowPass(dOut, dDelayBuffer[channel], synthVars.nFilterCutoff, synthVars.dResonance);*/
+			dOutputs[R_FLTR] = StateVLowPass(dOutputs[R_FLTR], dDelayBuffer[channel], synthVars.nFilterCutoff, synthVars.dResonance);
 		}
 		else if (i == R_MIXR_A)
 		{
-			for (int j = 0; j < R_NUM_ROUTES; j++)
+			for (int j = 0; j < R_NUM_DEVS-1; j++)
 				dOutputs[R_MIXR] += routingMatrix[j][R_MIXR_A] ? dOutputs[j] : 0.0;
 		}
 	}
@@ -971,15 +986,7 @@ double synthFunction(double d, byte channel)
 	double dOut = dOutputs[R_MIXR] * (synthVars.nMasterVolume / 100.0);
 
 	//quick distortion
-	//dOut = BitCrush(SoftClip(dOut, 20.0, 10.0));
-
-	//test Bi-Quad LP filtering
-	/*if (synthVars.bFilter)
-	{*/
-		static double dDelayBuffer[2][2] = { {0.0, 0.0}, {0.0, 0.0} };
-		/*dOut = BiQuadLowPass(dOut, dDelayBuffer[channel], synthVars.nFilterCutoff, synthVars.dResonance);*/
-		dOut = StateVLowPass(dOut, dDelayBuffer[channel], synthVars.nFilterCutoff, synthVars.dResonance);
-	//}
+	//dOut = BitCrush(SoftClip(dOut, 20.0, 10.0));	
 
 	unique_lock<mutex> outputMutex(synthVars.muxRWOutput);
 	synthVars.dCurrentOutput[channel].push_front(dOut);
