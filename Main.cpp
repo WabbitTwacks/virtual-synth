@@ -76,6 +76,9 @@ struct SynthVars
 
 	bool octaveKeyDownState = false;
 
+	uint16_t nFilterCutoff = 22000;
+	double dResonance = 1.0;
+
 	mutex muxRWOutput;
 	condition_variable cvIsOutputProcessed;
 	deque<double> dCurrentOutput[2];
@@ -155,6 +158,8 @@ private:
 	void OnFreqFine(wxCommandEvent& event);
 	void OnOctaveSelect(wxCommandEvent& event);
 	void OnEnvelope(wxCommandEvent& event);
+	void OnCutoff(wxCommandEvent& event);
+	void OnResonance(wxCommandEvent& event);
 
 	void OnPaint(wxPaintEvent &event);
 };
@@ -189,7 +194,9 @@ enum
 	ID_Att1,
 	ID_Dec1,
 	ID_Sus1,
-	ID_Rel1
+	ID_Rel1,
+	ID_CutOff1,
+	ID_Resonance1
 };
 
 wxIMPLEMENT_APP(MyApp);
@@ -369,7 +376,7 @@ MyFrame::MyFrame()
 	//oscillator panels
 	for (int i = 0; i < 3; i++)
 	{
-		oscPanel[i] = new wxPanel(mainPanel, wxID_ANY, { 12, 6 + i * 150 }, { 300, 150 }, wxSIMPLE_BORDER);
+		oscPanel[i] = new wxPanel(mainPanel, wxID_ANY, { 12, 6 + i * (150 + 4) }, { 300, 150 }, wxSIMPLE_BORDER);
 	}
 
 	choiceOscWave[0] = new wxChoice(oscPanel[0], ID_Wave1, { 6, 6 }, wxDefaultSize);
@@ -458,6 +465,7 @@ MyFrame::MyFrame()
 	octRadioBox[1]->SetSelection(synthVars.osc[1].GetOctaveMod() + 2);
 	Bind(wxEVT_RADIOBOX, &MyFrame::OnOctaveSelect, this, ID_OctSel2);
 
+
 	//envelope
 	wxPanel *envPanel = new wxPanel(mainPanel, wxID_ANY, { 320, 6 }, { 175, 150 }, wxSIMPLE_BORDER);
 
@@ -476,6 +484,18 @@ MyFrame::MyFrame()
 	wxSlider *relSlider = new wxSlider(envPanel, ID_Rel1,100 - (synthVars.ADSR.GetRelease()<=1000.0?(int)(synthVars.ADSR.GetRelease()*0.05):(int)(50 + (synthVars.ADSR.GetRelease()-1000.0)/(8999/49.0))), 0, 100, { 78, 6 }, wxDefaultSize, wxSL_VERTICAL);
 	Bind(wxEVT_SLIDER, &MyFrame::OnEnvelope, this, ID_Rel1);
 	wxStaticText *relLabel = new wxStaticText(envPanel, wxID_ANY, "R", { 86, 106 });
+
+
+	//filter
+	wxPanel *ftrPanel = new wxPanel(mainPanel, wxID_ANY, { 320, 160 }, { 175, 150 }, wxSIMPLE_BORDER);
+
+	wxSlider *cutoffSlider = new wxSlider(ftrPanel, ID_CutOff1, 100, 1, 100, { 6, 6 });
+	Bind(wxEVT_SLIDER, &MyFrame::OnCutoff, this, ID_CutOff1);
+	wxStaticText *coLabel = new wxStaticText(ftrPanel, wxID_ANY, "Cutoff", { 38, 26 });
+
+	wxSlider *resSlider = new wxSlider(ftrPanel, ID_Resonance1, 10, 1, 100, { 6, 40 });
+	Bind(wxEVT_SLIDER, &MyFrame::OnResonance, this, ID_Resonance1);
+	wxStaticText *resLabel = new wxStaticText(ftrPanel, wxID_ANY, "Resonance", { 38, 60 });
 }
 
 void MyFrame::OnExit(wxCommandEvent& event)
@@ -802,6 +822,30 @@ void MyFrame::OnEnvelope(wxCommandEvent & event)
 	SetFocus();
 }
 
+void MyFrame::OnCutoff(wxCommandEvent & event)
+{
+	wxSlider *s = dynamic_cast<wxSlider*>(event.GetEventObject());
+
+	if (s)
+	{
+		synthVars.nFilterCutoff = LinToLog(s->GetValue(), 1, 100, 30, 22000);
+	}
+
+	SetFocus();
+}
+
+void MyFrame::OnResonance(wxCommandEvent & event)
+{
+	wxSlider *s = dynamic_cast<wxSlider*>(event.GetEventObject());
+
+	if (s)
+	{
+		synthVars.dResonance = s->GetValue() / 10.0;
+	}
+
+	SetFocus();
+}
+
 void MyFrame::OnPaint(wxPaintEvent & event)
 {
 	wxPaintDC(this);
@@ -932,12 +976,11 @@ double synthFunction(double d, byte channel)
 	//dOut = BitCrush(SoftClip(dOut, 20.0, 10.0));
 
 	//test Bi-Quad LP filtering
-	if (synthVars.bFilter)
-	{
-		static double dDelayBuffer[2] = { 0.0, 0.0 };
-
-		dOut = BiQuadLowPass(dOut, dDelayBuffer, 1000.0, 1.0);
-	}
+	/*if (synthVars.bFilter)
+	{*/
+		static double dDelayBuffer[2][2] = { {0.0, 0.0}, {0.0, 0.0} };
+		dOut = BiQuadLowPass(dOut, dDelayBuffer[channel], synthVars.nFilterCutoff, synthVars.dResonance);
+	//}
 
 	unique_lock<mutex> outputMutex(synthVars.muxRWOutput);
 	synthVars.dCurrentOutput[channel].push_front(dOut);
