@@ -13,6 +13,7 @@ double SoftClip(double dInput, double dPosGain, double dNegGain);
 double BitCrush(double dInput, double dBits = 8.0);
 
 double BiQuadLowPass(double dInput, double(&dDelayBuffer)[2], double dFrequency, double dQ, int nSampleFreq = 44100);
+double StateVLowPass(double dInput, double(&dICEQ)[2], double dFrequency, double dQ, int nSampleRate = 44100);
 
 double SimpleLowPass(double currentSample)
 {
@@ -130,4 +131,28 @@ double BiQuadLowPass(double dInput, double (&dDelayBuffer)[2], double dFrequency
 	dDelayBuffer[1] = w;
 
 	return dOut;
+}
+
+double StateVLowPass(double dInput, double(&dICEQ)[2], double dFrequency, double dQ, int nSampleRate) //better for modulating with LFOs (no artifacts)
+{
+	double g = tan(PI * dFrequency / nSampleRate);
+	double k = 1.0 / dQ;
+	double a1 = 1.0 / (1.0 + g*(g + k));
+	double a2 = g * a1;
+	double a3 = g * a2;
+
+	double iceq1 = dICEQ[0];
+	double iceq2 = dICEQ[1];
+	double v0 = dInput;
+
+	double v3 = v0 - iceq2;
+	double v1 = a1 * iceq1 + a2 * v3;
+	double v2 = iceq2 + a2 * iceq1 + a3 * v3;
+	
+	iceq1 = 2 * v1 - iceq1;
+	iceq2 = 2 * v2 - iceq2;
+	dICEQ[0] = iceq1;
+	dICEQ[1] = iceq2;
+
+	return v2;
 }

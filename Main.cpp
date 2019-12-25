@@ -553,8 +553,6 @@ void MyFrame::OnMasterGauge(wxTimerEvent & event)
 	dRMSVolume[CH_LEFT] = sqrt(dRMSVolume[CH_LEFT]);
 	dRMSVolume[CH_RIGHT] = sqrt(dRMSVolume[CH_RIGHT]);
 
-	//SetStatusText(wxString::Format("RMS: %.2f", dRMSVolume));
-
 	double dB = (dRMSVolume[CH_LEFT] + dRMSVolume[CH_RIGHT] > 0.0) ? 20 * log10((dRMSVolume[CH_LEFT] + dRMSVolume[CH_RIGHT]) / 1.0) : -100000000.0;
 
 	SetStatusText(wxString::Format("dB: %.2f", dB));
@@ -569,9 +567,9 @@ void MyFrame::OnMasterGauge(wxTimerEvent & event)
 	dc.SetPen(*wxTRANSPARENT_PEN);
 	dc.DrawRectangle(13, 97, -12, -(int)((dB - dMinDB) * 97.0/(dMaxDB - dMinDB)));
 
-	int linePoint = 97 - (int)((-3 - dMinDB) * 97.0/(dMaxDB - dMinDB));
+	/*int linePoint = 97 - (int)((-3 - dMinDB) * 97.0/(dMaxDB - dMinDB));
 	dc.SetPen({ wxColor(0x0000ff) });
-	dc.DrawLine({ 0, linePoint }, { 16, linePoint });
+	dc.DrawLine({ 0, linePoint }, { 16, linePoint });*/
 }
 
 void MyFrame::OnOscWave(wxCommandEvent & event)
@@ -979,7 +977,8 @@ double synthFunction(double d, byte channel)
 	/*if (synthVars.bFilter)
 	{*/
 		static double dDelayBuffer[2][2] = { {0.0, 0.0}, {0.0, 0.0} };
-		dOut = BiQuadLowPass(dOut, dDelayBuffer[channel], synthVars.nFilterCutoff, synthVars.dResonance);
+		/*dOut = BiQuadLowPass(dOut, dDelayBuffer[channel], synthVars.nFilterCutoff, synthVars.dResonance);*/
+		dOut = StateVLowPass(dOut, dDelayBuffer[channel], synthVars.nFilterCutoff, synthVars.dResonance);
 	//}
 
 	unique_lock<mutex> outputMutex(synthVars.muxRWOutput);
