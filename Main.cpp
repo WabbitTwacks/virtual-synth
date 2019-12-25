@@ -217,8 +217,8 @@ bool MyApp::OnInit()
 	audioIF->SetUserFunction(synthFunction);
 
 	ZeroMemory(routingMatrix, R_NUM_ROUTES * (R_NUM_DEVS-1));
-	routingMatrix[R_OSC1][R_MIXR_A] = true;
-	routingMatrix[R_OSC2][R_MIXR_A] = true;
+	routingMatrix[R_OSC1][R_FLTR_I] = true;
+	routingMatrix[R_OSC2][R_FLTR_I] = true;
 	routingMatrix[R_FLTR][R_MIXR_A] = true;
 
 	//synthVars.osc[1].SetLFO(true);
@@ -424,8 +424,8 @@ MyFrame::MyFrame()
 	Bind(wxEVT_RADIOBOX, &MyFrame::OnOctaveSelect, this, ID_OctSel1);
 
 	choiceOscRouting[0] = new wxChoice(oscPanel[0], ID_OscRouting1, { 6, 120 });
-	choiceOscRouting[0]->Append(vector<wxString>({ "Mixer", "Osc1 Pitch", "Osc1 Amp", "Osc2 Pitch", "Osc2 Amp", "---", "---","Filter In" }));
-	choiceOscRouting[0]->SetSelection(0);
+	choiceOscRouting[0]->Append(vector<wxString>({ "Mixer", "Osc1 Pitch", "Osc1 Amp", "Osc2 Pitch", "Osc2 Amp", "---", "---","Filter In", "Fltr Cutoff" }));
+	choiceOscRouting[0]->SetSelection(7);
 	Bind(wxEVT_CHOICE, &MyFrame::OnOscRouting, this, ID_OscRouting1);
 
 	//------
@@ -460,8 +460,8 @@ MyFrame::MyFrame()
 	Bind(wxEVT_CHECKBOX, &MyFrame::OnOscDrone, this, ID_Drone2);
 
 	choiceOscRouting[1] = new wxChoice(oscPanel[1], ID_OscRouting2, { 6, 120 });
-	choiceOscRouting[1]->Append(vector<wxString>({ "Mixer", "Osc1 Pitch", "Osc1 Amp", "Osc2 Pitch", "Osc2 Amp", "---", "---","Filter In" }));
-	choiceOscRouting[1]->SetSelection(0);
+	choiceOscRouting[1]->Append(vector<wxString>({ "Mixer", "Osc1 Pitch", "Osc1 Amp", "Osc2 Pitch", "Osc2 Amp", "---", "---","Filter In", "Fltr Cutoff" }));
+	choiceOscRouting[1]->SetSelection(7);
 	Bind(wxEVT_CHOICE, &MyFrame::OnOscRouting, this, ID_OscRouting2);
 
 	checkLFO[1] = new wxCheckBox(oscPanel[1], ID_OscLFO2, "LFO", { 70, 55 });
@@ -970,11 +970,25 @@ double synthFunction(double d, byte channel)
 		}
 		else if (i == R_FLTR_C) //Filter cutoff modulation
 		{
-			
+			double dCutoff = synthVars.nFilterCutoff;
+
+			for (int j = 0; j < 3; j++)
+			{
+				if (routingMatrix[j][R_FLTR_C])
+				{
+					double dMod = synthVars.osc[j].Play(synthVars.osc[j].GetFrequency(), d, channel) + (1.0 - synthVars.osc[j].GetVolume());
+					double dScale = LinToLog(dMod, -1.0, 1.0, 0.001, 1.0);
+
+					dCutoff *= dScale;
+				}
+			}
+
 			//Apply Low Pass Filtering to signals going through filter	
 			static double dDelayBuffer[2][2] = { {0.0, 0.0}, {0.0, 0.0} };
-			/*dOut = BiQuadLowPass(dOut, dDelayBuffer[channel], synthVars.nFilterCutoff, synthVars.dResonance);*/
-			dOutputs[R_FLTR] = StateVLowPass(dOutputs[R_FLTR], dDelayBuffer[channel], synthVars.nFilterCutoff, synthVars.dResonance);
+			
+			dOutputs[R_FLTR] = StateVLowPass(dOutputs[R_FLTR], dDelayBuffer[channel], dCutoff, synthVars.dResonance);
+			//second order
+			dOutputs[R_FLTR] = StateVLowPass(dOutputs[R_FLTR], dDelayBuffer[channel], dCutoff, synthVars.dResonance);
 		}
 		else if (i == R_MIXR_A)
 		{
