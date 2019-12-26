@@ -581,8 +581,6 @@ void MyFrame::OnMasterGauge(wxTimerEvent & event)
 
 		dRMSVolume[CH_LEFT] += synthVars.dOutputBuffer[CH_LEFT][i] * synthVars.dOutputBuffer[CH_LEFT][i];
 		dRMSVolume[CH_RIGHT] += synthVars.dOutputBuffer[CH_RIGHT][i] * synthVars.dOutputBuffer[CH_RIGHT][i];
-
-		synthVars.bBuffReady.store(false);
 	}
 
 	/*outputMutex.unlock();
@@ -1110,15 +1108,17 @@ double synthFunction(double d, byte channel)
 	//tStart = std::chrono::high_resolution_clock::now();
 
 	//unique_lock<mutex> outputMutex(synthVars.muxRWOutput);
+	synthVars.bBuffReady.store(false);
 	synthVars.dOutputBuffer[channel][synthVars.nBufferPos] = dOut;
 
 	if (channel == CH_RIGHT) //let output data be available after both channels have been porcessed
 	{
+		synthVars.bBuffReady.store(true);
+
 		synthVars.nBufferPos++;
 		synthVars.nBufferPos %= AVERAGE_SAMPLES;
 
-		//synthVars.cvIsOutputProcessed.notify_one();
-		synthVars.bBuffReady.store(true);
+		//synthVars.cvIsOutputProcessed.notify_one();		
 	}
 		
 	/*auto tBuff = std::chrono::high_resolution_clock::now();
