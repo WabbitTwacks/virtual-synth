@@ -80,6 +80,7 @@ struct SynthVars
 
 	uint16_t nFilterCutoff = 22000;
 	double dResonance = 1.0;
+	bool bFourthOrder = false;
 
 	mutex muxRWOutput;
 	condition_variable cvIsOutputProcessed;
@@ -163,6 +164,7 @@ private:
 	void OnEnvRoute(wxCommandEvent& event);
 	void OnCutoff(wxCommandEvent& event);
 	void OnResonance(wxCommandEvent& event);
+	void OnFltrPoles(wxCommandEvent& event);
 
 	void OnPaint(wxPaintEvent &event);
 };
@@ -200,7 +202,8 @@ enum
 	ID_Rel1,
 	ID_EnvRoute1,
 	ID_CutOff1,
-	ID_Resonance1
+	ID_Resonance1,
+	ID_FltrPoles1
 };
 
 wxIMPLEMENT_APP(MyApp);
@@ -512,6 +515,11 @@ MyFrame::MyFrame()
 	wxSlider *resSlider = new wxSlider(ftrPanel, ID_Resonance1, 10, 1, 100, { 6, 40 });
 	Bind(wxEVT_SLIDER, &MyFrame::OnResonance, this, ID_Resonance1);
 	wxStaticText *resLabel = new wxStaticText(ftrPanel, wxID_ANY, "Resonance", { 38, 60 });
+
+	wxChoice *fltrPoles = new wxChoice(ftrPanel, ID_FltrPoles1, { 6, 120 }, wxDefaultSize);
+	fltrPoles->Append(vector<wxString>({ "12 dB/Oct", "24 dB/Oct" }));
+	fltrPoles->SetSelection(0);
+	Bind(wxEVT_CHOICE, &MyFrame::OnFltrPoles, this, ID_FltrPoles1);
 }
 
 void MyFrame::OnExit(wxCommandEvent& event)
@@ -872,10 +880,20 @@ void MyFrame::OnResonance(wxCommandEvent & event)
 
 	if (s)
 	{
-		synthVars.dResonance = s->GetValue() / 10.0;
+		synthVars.dResonance = s->GetValue() / 20.0;
 	}
 
 	SetFocus();
+}
+
+void MyFrame::OnFltrPoles(wxCommandEvent & event)
+{
+	wxChoice *cb = dynamic_cast<wxChoice*>(event.GetEventObject());
+
+	if (cb)
+	{
+		synthVars.bFourthOrder = cb->GetSelection() ? true : false;
+	}
 }
 
 void MyFrame::OnPaint(wxPaintEvent & event)
@@ -1032,6 +1050,15 @@ double synthFunction(double d, byte channel)
 			dOutputs[R_FLTR] = StateVLowPass(dOutputs[R_FLTR], dDelayBuffer[channel], dCutoff, synthVars.dResonance); //-6 dB/Oct
 			//second order
 			dOutputs[R_FLTR] = StateVLowPass(dOutputs[R_FLTR], dDelayBuffer2[channel], dCutoff, synthVars.dResonance); //-12 dB/Oct
+
+			if (synthVars.bFourthOrder)
+			{
+				static double dDelayBuffer3[2][2] = { {0.0, 0.0}, {0.0, 0.0} };
+				static double dDelayBuffer4[2][2] = { {0.0, 0.0}, {0.0, 0.0} };
+
+				dOutputs[R_FLTR] = StateVLowPass(dOutputs[R_FLTR], dDelayBuffer3[channel], dCutoff, synthVars.dResonance);
+				dOutputs[R_FLTR] = StateVLowPass(dOutputs[R_FLTR], dDelayBuffer4[channel], dCutoff, synthVars.dResonance); //-24 dB/Oct
+			}
 		}
 		else if (i == R_MIXR_A)
 		{
@@ -1054,5 +1081,5 @@ double synthFunction(double d, byte channel)
 		synthVars.cvIsOutputProcessed.notify_one();
 	
 	static double dHPBuffer[2][2] = { {0.0, 0.0}, {0.0, 0.0 } };
-	return BiQuadHighPass(dOut, dHPBuffer[channel], 30.0, 1.41);
+	return BiQuadHighPass(dOut, dHPBuffer[channel], 30.0, 1.0);
 }
