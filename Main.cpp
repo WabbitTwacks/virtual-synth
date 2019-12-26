@@ -9,6 +9,7 @@
 #include <deque>
 #include <mutex>
 #include <condition_variable>
+#include <chrono>
 
 #include "Helpers.h"
 #include "AudioInterface.h"
@@ -59,6 +60,15 @@ const wxString VERSION = "1.00";
 
 using namespace std;
 
+struct Bench
+{
+	atomic <double> waveGen = 0.0;
+	atomic <double> modulation = 0.0;
+	atomic <double> filter = 0.0;
+	atomic <double> outputBuffer = 0.0;
+
+} bench;
+
 struct SynthVars
 {
 	unsigned int nMasterVolume = INIT_MASTER_VOLUME;
@@ -84,7 +94,8 @@ struct SynthVars
 
 	mutex muxRWOutput;
 	condition_variable cvIsOutputProcessed;
-	deque<double> dCurrentOutput[2];
+	double dOutputBuffer[2][AVERAGE_SAMPLES];
+	int nBufferPos = 0;
 
 	bool bFilter = false;
 
@@ -210,6 +221,8 @@ wxIMPLEMENT_APP(MyApp);
 
 bool MyApp::OnInit()
 {
+	ZeroMemory(synthVars.dOutputBuffer, 2 * AVERAGE_SAMPLES * sizeof(double));
+
 	vector<string> devices = AudioInterface::GetDevices();
 
 	audioIF = new AudioInterface(devices[0], 44100, 2, 128, 32); //use first device in list
@@ -556,17 +569,13 @@ void MyFrame::OnMasterGauge(wxTimerEvent & event)
 	unique_lock<mutex> outputMutex(synthVars.muxRWOutput);
 	synthVars.cvIsOutputProcessed.wait(outputMutex);
 
-	if (synthVars.dCurrentOutput[CH_LEFT].size() < AVERAGE_SAMPLES ||
-		synthVars.dCurrentOutput[CH_RIGHT].size() < AVERAGE_SAMPLES)
-		return;
-
 	//calculate RMS for Output Signal
 	double dRMSVolume[2] = { 0.0, 0.0 };
 
 	for (int i = 0; i < AVERAGE_SAMPLES; i++)
 	{
-		dRMSVolume[CH_LEFT] += synthVars.dCurrentOutput[CH_LEFT][i] * synthVars.dCurrentOutput[CH_LEFT][i];
-		dRMSVolume[CH_RIGHT] += synthVars.dCurrentOutput[CH_RIGHT][i] * synthVars.dCurrentOutput[CH_RIGHT][i];
+		dRMSVolume[CH_LEFT] += synthVars.dOutputBuffer[CH_LEFT][i] * synthVars.dOutputBuffer[CH_LEFT][i];
+		dRMSVolume[CH_RIGHT] += synthVars.dOutputBuffer[CH_RIGHT][i] * synthVars.dOutputBuffer[CH_RIGHT][i];
 	}
 
 	outputMutex.unlock();
@@ -579,6 +588,8 @@ void MyFrame::OnMasterGauge(wxTimerEvent & event)
 
 	double dB = (dRMSVolume[CH_LEFT] + dRMSVolume[CH_RIGHT] > 0.0) ? 20 * log10((dRMSVolume[CH_LEFT] + dRMSVolume[CH_RIGHT]) / 1.0) : -100000000.0;
 
+	//level + benchmarking
+	//SetStatusText(wxString::Format("dB: %.2f    Benchmarks: osc: %.4f, mod: %.4f, fltr: %.4f, buff: %.4f, sample: %.4f", dB, bench.waveGen.load(), bench.modulation.load(), bench.filter.load(), bench.outputBuffer.load(), 1000.0/41000.0));
 	SetStatusText(wxString::Format("dB: %.2f", dB));
 
 	double dMinDB = 20 * log10(0.001 / 1.0); //-60 dB
@@ -948,8 +959,9 @@ double synthFunction(double d, byte channel)
 {
 	double dOutputs[R_NUM_DEVS] = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
 
-	const uint8_t *deviceMap = synthVars.deviceMap;
-	 
+	const uint8_t *deviceMap = synthVars.deviceMap;	 
+
+	//auto tStart = std::chrono::high_resolution_clock::now();
 
 	//Generate outputs from oscillators
 	for (int i = 0; i < 3; i++)
@@ -974,6 +986,11 @@ double synthFunction(double d, byte channel)
 		}
 	}
 
+	/*auto tOsc = std::chrono::high_resolution_clock::now();
+	auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(tOsc - tStart).count();
+	bench.waveGen.store(duration);
+
+	tStart = std::chrono::high_resolution_clock::now();*/
 	//Check Routing Matrix
 	for (int i = 0; i < R_NUM_ROUTES; i++)
 	{
@@ -1015,6 +1032,12 @@ double synthFunction(double d, byte channel)
 		}
 		else if (i == R_FLTR_I) //Filter input
 		{
+			/*auto tMod = std::chrono::high_resolution_clock::now();
+			auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(tMod - tStart).count();
+			bench.modulation.store(duration);
+
+			tStart = std::chrono::high_resolution_clock::now();*/
+
 			for (int j = 0; j < 3; j++)
 			{
 				dOutputs[R_FLTR] += routingMatrix[j][R_FLTR_I] ? dOutputs[j] : 0.0;
@@ -1059,6 +1082,11 @@ double synthFunction(double d, byte channel)
 				dOutputs[R_FLTR] = StateVLowPass(dOutputs[R_FLTR], dDelayBuffer3[channel], dCutoff, synthVars.dResonance);
 				dOutputs[R_FLTR] = StateVLowPass(dOutputs[R_FLTR], dDelayBuffer4[channel], dCutoff, synthVars.dResonance); //-24 dB/Oct
 			}
+
+			/*auto tFltr = std::chrono::high_resolution_clock::now();
+			auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(tFltr - tStart).count();
+			bench.filter.store(duration);*/
+
 		}
 		else if (i == R_MIXR_A)
 		{
@@ -1072,13 +1100,22 @@ double synthFunction(double d, byte channel)
 	//quick distortion
 	//dOut = BitCrush(SoftClip(dOut, 20.0, 10.0));	
 
+	//tStart = std::chrono::high_resolution_clock::now();
+
 	unique_lock<mutex> outputMutex(synthVars.muxRWOutput);
-	synthVars.dCurrentOutput[channel].push_front(dOut);
-	if (synthVars.dCurrentOutput[channel].size() > AVERAGE_SAMPLES)
-		synthVars.dCurrentOutput[channel].pop_back();	
+	synthVars.dOutputBuffer[channel][synthVars.nBufferPos] = dOut;
 
 	if (channel == CH_RIGHT) //let output data be available after both channels have been porcessed
+	{
+		synthVars.nBufferPos++;
+		synthVars.nBufferPos %= AVERAGE_SAMPLES;
+
 		synthVars.cvIsOutputProcessed.notify_one();
+	}
+		
+	/*auto tBuff = std::chrono::high_resolution_clock::now();
+	duration = std::chrono::duration_cast<std::chrono::microseconds>(tBuff - tStart).count();
+	bench.outputBuffer.store(duration);*/
 	
 	static double dHPBuffer[2][2] = { {0.0, 0.0}, {0.0, 0.0 } };
 	return BiQuadHighPass(dOut, dHPBuffer[channel], 30.0, 1.0);
