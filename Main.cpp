@@ -1027,10 +1027,11 @@ double synthFunction(double d, byte channel)
 
 			//Apply Low Pass Filtering to signals going through filter	
 			static double dDelayBuffer[2][2] = { {0.0, 0.0}, {0.0, 0.0} };
+			static double dDelayBuffer2[2][2] = { {0.0, 0.0}, {0.0, 0.0} };
 			
 			dOutputs[R_FLTR] = StateVLowPass(dOutputs[R_FLTR], dDelayBuffer[channel], dCutoff, synthVars.dResonance); //-6 dB/Oct
 			//second order
-			dOutputs[R_FLTR] = StateVLowPass(dOutputs[R_FLTR], dDelayBuffer[channel], dCutoff, synthVars.dResonance); //-12 dB/Oct
+			dOutputs[R_FLTR] = StateVLowPass(dOutputs[R_FLTR], dDelayBuffer2[channel], dCutoff, synthVars.dResonance); //-12 dB/Oct
 		}
 		else if (i == R_MIXR_A)
 		{
@@ -1052,5 +1053,6 @@ double synthFunction(double d, byte channel)
 	if (channel == CH_RIGHT) //let output data be available after both channels have been porcessed
 		synthVars.cvIsOutputProcessed.notify_one();
 	
-	return dOut;
+	static double dHPBuffer[2][2] = { {0.0, 0.0}, {0.0, 0.0 } };
+	return BiQuadHighPass(dOut, dHPBuffer[channel], 30.0, 1.41);
 }

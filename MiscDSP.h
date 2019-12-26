@@ -13,6 +13,7 @@ double SoftClip(double dInput, double dPosGain, double dNegGain);
 double BitCrush(double dInput, double dBits = 8.0);
 
 double BiQuadLowPass(double dInput, double(&dDelayBuffer)[2], double dFrequency, double dQ, int nSampleFreq = 44100);
+double BiQuadHighPass(double dInput, double(&dDelayBuffer)[2], double dFrequency, double dQ, int nSampleRate = 44100);
 double StateVLowPass(double dInput, double(&dICEQ)[2], double dFrequency, double dQ, int nSampleRate = 44100);
 
 double SimpleLowPass(double currentSample)
@@ -127,6 +128,32 @@ double BiQuadLowPass(double dInput, double (&dDelayBuffer)[2], double dFrequency
 	double w = dInput + (-a1 / a0)*w1 + (-a2 / a0)*w2;
 	double dOut = (b0 / a0)*w + (b1 / a0)*w1 + (b2 / a0)*w2;
 	
+	dDelayBuffer[0] = w1;
+	dDelayBuffer[1] = w;
+
+	return dOut;
+}
+
+double BiQuadHighPass(double dInput, double(&dDelayBuffer)[2], double dFrequency, double dQ, int nSampleRate)
+{
+	double w0 = 2 * PI * dFrequency / nSampleRate;
+	double alpha = sin(w0) / (2 * dQ);
+
+	//high pass filter coefficients
+	double b0 = (1 + cos(w0)) / 2.0;
+	double b1 = -(1 + cos(w0));
+	double b2 = b0;
+	double a0 = 1 + alpha;
+	double a1 = -2 * cos(w0);
+	double a2 = 1 - alpha;
+
+	//Direct From II
+	double w1 = dDelayBuffer[1];
+	double w2 = dDelayBuffer[0];
+
+	double w = dInput + (-a1 / a0)*w1 + (-a2 / a0)*w2;
+	double dOut = (b0 / a0)*w + (b1 / a0)*w1 + (b2 / a0)*w2;
+
 	dDelayBuffer[0] = w1;
 	dDelayBuffer[1] = w;
 
