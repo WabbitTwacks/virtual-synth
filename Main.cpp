@@ -37,9 +37,10 @@
 #define R_OSC2 1
 #define R_OSC3 2
 #define R_FLTR 3
-#define R_MIXR 4 //only for dOutputs
+#define R_ENV 4
+#define R_MIXR 5 //only for dOutputs
 
-#define R_NUM_DEVS 5
+#define R_NUM_DEVS 6
 
 //matrix routing targets
 #define R_OSC1_P 0
@@ -159,6 +160,7 @@ private:
 	void OnFreqFine(wxCommandEvent& event);
 	void OnOctaveSelect(wxCommandEvent& event);
 	void OnEnvelope(wxCommandEvent& event);
+	void OnEnvRoute(wxCommandEvent& event);
 	void OnCutoff(wxCommandEvent& event);
 	void OnResonance(wxCommandEvent& event);
 
@@ -196,6 +198,7 @@ enum
 	ID_Dec1,
 	ID_Sus1,
 	ID_Rel1,
+	ID_EnvRoute1,
 	ID_CutOff1,
 	ID_Resonance1
 };
@@ -206,7 +209,7 @@ bool MyApp::OnInit()
 {
 	vector<string> devices = AudioInterface::GetDevices();
 
-	audioIF = new AudioInterface(devices[0], 44100, 2, 8, 512); //use first device in list
+	audioIF = new AudioInterface(devices[0], 44100, 2, 128, 32); //use first device in list
 
 	if (!audioIF->GetActive())
 	{
@@ -220,6 +223,7 @@ bool MyApp::OnInit()
 	routingMatrix[R_OSC1][R_FLTR_I] = true;
 	routingMatrix[R_OSC2][R_FLTR_I] = true;
 	routingMatrix[R_FLTR][R_MIXR_A] = true;
+	routingMatrix[R_ENV][R_MIXR_A] = true;
 
 	//synthVars.osc[1].SetLFO(true);
 	//synthVars.osc[1].SetFrequency(1.0);
@@ -476,21 +480,26 @@ MyFrame::MyFrame()
 	//envelope
 	wxPanel *envPanel = new wxPanel(mainPanel, wxID_ANY, { 320, 6 }, { 175, 150 }, wxSIMPLE_BORDER);
 
-	wxSlider *attSlider = new wxSlider(envPanel, ID_Att1, 1000 - synthVars.ADSR.GetAttack(), 0, 1000, { 6, 6 }, wxDefaultSize, wxSL_VERTICAL);
+	wxSlider *attSlider = new wxSlider(envPanel, ID_Att1, 1000 - synthVars.ADSR.GetAttack(), 1, 1000, { 6, 6 }, wxDefaultSize, wxSL_VERTICAL);
 	Bind(wxEVT_SLIDER, &MyFrame::OnEnvelope, this, ID_Att1);
-	wxStaticText *attLabel = new wxStaticText(envPanel, wxID_ANY, "A", { 14, 106 });
+	wxStaticText *attLabel = new wxStaticText(envPanel, wxID_ANY, "A", { 14, 104 });
 
-	wxSlider *decSlider = new wxSlider(envPanel, ID_Dec1, 500 - synthVars.ADSR.GetDecay() * 10, 0, 500, { 30, 6 }, wxDefaultSize, wxSL_VERTICAL);
+	wxSlider *decSlider = new wxSlider(envPanel, ID_Dec1, 500 - synthVars.ADSR.GetDecay() * 10, 1, 500, { 30, 6 }, wxDefaultSize, wxSL_VERTICAL);
 	Bind(wxEVT_SLIDER, &MyFrame::OnEnvelope, this, ID_Dec1);
-	wxStaticText *decLabel = new wxStaticText(envPanel, wxID_ANY, "D", { 38, 106 });
+	wxStaticText *decLabel = new wxStaticText(envPanel, wxID_ANY, "D", { 38, 104 });
 
 	wxSlider *susSlider = new wxSlider(envPanel, ID_Sus1, 100 - (int)(synthVars.ADSR.GetSustain()*100.0), 0, 100, { 54, 6 }, wxDefaultSize, wxSL_VERTICAL);
 	Bind(wxEVT_SLIDER, &MyFrame::OnEnvelope, this, ID_Sus1);
-	wxStaticText *susLabel = new wxStaticText(envPanel, wxID_ANY, "S", { 62, 106 });
+	wxStaticText *susLabel = new wxStaticText(envPanel, wxID_ANY, "S", { 62, 104 });
 
-	wxSlider *relSlider = new wxSlider(envPanel, ID_Rel1,100 - (synthVars.ADSR.GetRelease()<=1000.0?(int)(synthVars.ADSR.GetRelease()*0.05):(int)(50 + (synthVars.ADSR.GetRelease()-1000.0)/(8999/49.0))), 0, 100, { 78, 6 }, wxDefaultSize, wxSL_VERTICAL);
+	wxSlider *relSlider = new wxSlider(envPanel, ID_Rel1,100 - (synthVars.ADSR.GetRelease()<=1000.0?(int)(synthVars.ADSR.GetRelease()*0.05):(int)(50 + (synthVars.ADSR.GetRelease()-1000.0)/(8999/49.0))), 1, 100, { 78, 6 }, wxDefaultSize, wxSL_VERTICAL);
 	Bind(wxEVT_SLIDER, &MyFrame::OnEnvelope, this, ID_Rel1);
-	wxStaticText *relLabel = new wxStaticText(envPanel, wxID_ANY, "R", { 86, 106 });
+	wxStaticText *relLabel = new wxStaticText(envPanel, wxID_ANY, "R", { 86, 104 });
+
+	wxChoice *envRoute = new wxChoice(envPanel, ID_EnvRoute1, { 6, 120 }, wxDefaultSize);
+	envRoute->Append(vector<wxString>({ "Mixer Amp", "Filter Cutoff" }));
+	envRoute->SetSelection(0);
+	Bind(wxEVT_CHOICE, &MyFrame::OnEnvRoute, this, ID_EnvRoute1);
 
 
 	//filter
@@ -824,6 +833,27 @@ void MyFrame::OnEnvelope(wxCommandEvent & event)
 	SetFocus();
 }
 
+void MyFrame::OnEnvRoute(wxCommandEvent & event)
+{
+	wxChoice *cb = dynamic_cast<wxChoice*>(event.GetEventObject());
+
+	if (cb)
+	{
+		ZeroMemory(routingMatrix[R_ENV], R_NUM_ROUTES);
+
+		if (cb->GetSelection() == 0) //Mixer Amp
+		{
+			routingMatrix[R_ENV][R_MIXR_A] = true;
+		}
+		else if (cb->GetSelection() == 1) //Filter Cutoff
+		{
+			routingMatrix[R_ENV][R_FLTR_C] = true;
+		}
+	}
+
+	SetFocus();
+}
+
 void MyFrame::OnCutoff(wxCommandEvent & event)
 {
 	wxSlider *s = dynamic_cast<wxSlider*>(event.GetEventObject());
@@ -898,7 +928,7 @@ MyFrame::~MyFrame()
 
 double synthFunction(double d, byte channel)
 {
-	double dOutputs[R_NUM_DEVS] = { 0.0, 0.0, 0.0, 0.0, 0.0 };
+	double dOutputs[R_NUM_DEVS] = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
 
 	const uint8_t *deviceMap = synthVars.deviceMap;
 	 
@@ -917,7 +947,11 @@ double synthFunction(double d, byte channel)
 					uint8_t nSemiTone = note + synthVars.osc[i].GetOctaveMod()*12;
 					if (nSemiTone >= 12 * 9 || nSemiTone < 0) continue;
 					//double dFrequency = C_SHARP_0 * pow(2, nSemiTone / 12.0);
-					dOutputs[i] += synthVars.ADSR.GetAmplitude() * OSC_VOLUME * synthVars.osc[i].Play(synthVars.dNotes[nSemiTone], d, channel);
+					if (routingMatrix[R_ENV][R_MIXR_A])
+						dOutputs[i] += synthVars.ADSR.GetAmplitude() * OSC_VOLUME * synthVars.osc[i].Play(synthVars.dNotes[nSemiTone], d, channel);
+					/*else if (synthVars.numKeysDown > 0)*/
+					else
+						dOutputs[i] += OSC_VOLUME * synthVars.osc[i].Play(synthVars.dNotes[nSemiTone], d, channel);
 			}
 		}
 	}
@@ -974,7 +1008,7 @@ double synthFunction(double d, byte channel)
 
 			for (int j = 0; j < 3; j++)
 			{
-				if (routingMatrix[j][R_FLTR_C])
+				if (routingMatrix[j][R_FLTR_C]) //osc modulation
 				{
 					double dMod = synthVars.osc[j].Play(synthVars.osc[j].GetFrequency(), d, channel) + (1.0 - synthVars.osc[j].GetVolume());
 					double dScale = LinToLog(dMod, -1.0, 1.0, 0.001, 1.0);
@@ -983,12 +1017,20 @@ double synthFunction(double d, byte channel)
 				}
 			}
 
+			if (routingMatrix[R_ENV][R_FLTR_C]) //env modulation
+			{
+				double dMod = synthVars.ADSR.GetAmplitude();
+				double dScale = LinToLog(dMod, 0.0, 1.0, 0.000001, 1.0);
+
+				dCutoff *= dScale;
+			}
+
 			//Apply Low Pass Filtering to signals going through filter	
 			static double dDelayBuffer[2][2] = { {0.0, 0.0}, {0.0, 0.0} };
 			
-			dOutputs[R_FLTR] = StateVLowPass(dOutputs[R_FLTR], dDelayBuffer[channel], dCutoff, synthVars.dResonance);
+			dOutputs[R_FLTR] = StateVLowPass(dOutputs[R_FLTR], dDelayBuffer[channel], dCutoff, synthVars.dResonance); //-6 dB/Oct
 			//second order
-			dOutputs[R_FLTR] = StateVLowPass(dOutputs[R_FLTR], dDelayBuffer[channel], dCutoff, synthVars.dResonance);
+			dOutputs[R_FLTR] = StateVLowPass(dOutputs[R_FLTR], dDelayBuffer[channel], dCutoff, synthVars.dResonance); //-12 dB/Oct
 		}
 		else if (i == R_MIXR_A)
 		{

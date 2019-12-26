@@ -57,8 +57,8 @@ double Envelope::GetAmplitude()
 	clock_t time = std::clock();
 
 	
-	clock_t attack = (int)(parameters.dAttack * (double)CLOCKS_PER_SEC / 1000.0);
-	clock_t decay = (int)(parameters.dDecay * (double)CLOCKS_PER_SEC / 1000.0);
+	clock_t attack = (int)(parameters.dAttack * (double)CLOCKS_PER_SEC / 1000.0) + 1;
+	clock_t decay = (int)(parameters.dDecay * (double)CLOCKS_PER_SEC / 1000.0) + 1;
 
 	if ((time - dTriggerStartTime) <= attack && !bReleased) //Attack
 	{		
@@ -79,7 +79,7 @@ double Envelope::GetAmplitude()
 	}
 	else //calculate release amplitude
 	{
-		clock_t release = (int)(parameters.dRelease * (double)CLOCKS_PER_SEC/1000.0);
+		clock_t release = (int)(parameters.dRelease * (double)CLOCKS_PER_SEC/1000.0) + 1;
 
 		if (bReleased)
 		{
