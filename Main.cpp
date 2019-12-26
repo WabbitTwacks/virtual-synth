@@ -96,6 +96,7 @@ struct SynthVars
 	condition_variable cvIsOutputProcessed;
 	double dOutputBuffer[2][AVERAGE_SAMPLES];
 	int nBufferPos = 0;
+	atomic <bool> bBuffReady = false;
 
 	bool bFilter = false;
 
@@ -566,20 +567,26 @@ void MyFrame::OnMaster(wxCommandEvent & event)
 
 void MyFrame::OnMasterGauge(wxTimerEvent & event)
 {
-	unique_lock<mutex> outputMutex(synthVars.muxRWOutput);
-	synthVars.cvIsOutputProcessed.wait(outputMutex);
+	/*unique_lock<mutex> outputMutex(synthVars.muxRWOutput);
+	synthVars.cvIsOutputProcessed.wait(outputMutex);*/
 
 	//calculate RMS for Output Signal
 	double dRMSVolume[2] = { 0.0, 0.0 };
 
 	for (int i = 0; i < AVERAGE_SAMPLES; i++)
 	{
+		while (!synthVars.bBuffReady.load())
+		{
+		}
+
 		dRMSVolume[CH_LEFT] += synthVars.dOutputBuffer[CH_LEFT][i] * synthVars.dOutputBuffer[CH_LEFT][i];
 		dRMSVolume[CH_RIGHT] += synthVars.dOutputBuffer[CH_RIGHT][i] * synthVars.dOutputBuffer[CH_RIGHT][i];
+
+		synthVars.bBuffReady.store(false);
 	}
 
-	outputMutex.unlock();
-	synthVars.cvIsOutputProcessed.notify_one();
+	/*outputMutex.unlock();
+	synthVars.cvIsOutputProcessed.notify_one();*/
 
 	dRMSVolume[CH_LEFT] /= (double)AVERAGE_SAMPLES;
 	dRMSVolume[CH_RIGHT] /= (double)AVERAGE_SAMPLES;
@@ -1102,7 +1109,7 @@ double synthFunction(double d, byte channel)
 
 	//tStart = std::chrono::high_resolution_clock::now();
 
-	unique_lock<mutex> outputMutex(synthVars.muxRWOutput);
+	//unique_lock<mutex> outputMutex(synthVars.muxRWOutput);
 	synthVars.dOutputBuffer[channel][synthVars.nBufferPos] = dOut;
 
 	if (channel == CH_RIGHT) //let output data be available after both channels have been porcessed
@@ -1110,7 +1117,8 @@ double synthFunction(double d, byte channel)
 		synthVars.nBufferPos++;
 		synthVars.nBufferPos %= AVERAGE_SAMPLES;
 
-		synthVars.cvIsOutputProcessed.notify_one();
+		//synthVars.cvIsOutputProcessed.notify_one();
+		synthVars.bBuffReady.store(true);
 	}
 		
 	/*auto tBuff = std::chrono::high_resolution_clock::now();
