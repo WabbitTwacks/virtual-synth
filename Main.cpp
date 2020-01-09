@@ -618,10 +618,9 @@ void MyFrame::OnOscWave(wxCommandEvent & event)
 
 	if (c)
 	{
-		if (c->GetId() == ID_Wave1)
-			synthVars.osc[0].SetWave(c->GetSelection() + 1);
-		else if (c->GetId() == ID_Wave2)
-			synthVars.osc[1].SetWave(c->GetSelection() + 1);
+		int id = c->GetId() - ID_Wave1;
+		
+		synthVars.osc[id].SetWave(c->GetSelection() + 1);		
 	}
 	SetFocus();
 }
@@ -659,18 +658,11 @@ void MyFrame::OnOscVol(wxCommandEvent & event)
 
 	if (s)
 	{
-		if (s->GetId() == ID_Vol1)
-		{
-			synthVars.osc[0].SetVolume(1.0 - (double)s->GetValue() / 100.0);
+		int id = s->GetId() - ID_Vol1;
+		
+		synthVars.osc[id].SetVolume(1.0 - (double)s->GetValue() / 100.0);
 
-			SetStatusText(wxString::Format("Volume 1: %d", 100 - s->GetValue()));
-		}
-		else if (s->GetId() == ID_Vol2)
-		{
-			synthVars.osc[1].SetVolume(1.0 - (double)s->GetValue() / 100.0);
-
-			SetStatusText(wxString::Format("Volume 2: %d", 100 - s->GetValue()));
-		}
+		SetStatusText(wxString::Format("Volume %d: %d", id+1, 100 - s->GetValue()));		
 	}
 
 	SetFocus();
@@ -682,34 +674,19 @@ void MyFrame::OnOscFreq(wxCommandEvent & event)
 
 	if (s)
 	{
-		if (s->GetId() == ID_Freq1)
-		{
-			double f1;
-			if (synthVars.osc[0].IsLFO())
-				f1 = s->GetValue() * LFO_MAX / 1000.0;
-			else
-				f1 = LinToLog(s->GetValue(), 1.0, 1000.0, FREQ_MIN, FREQ_MAX);
+		int id = s->GetId() - ID_Freq1;
+		
+		double f1;
+		if (synthVars.osc[id].IsLFO())
+			f1 = s->GetValue() * LFO_MAX / 1000.0;
+		else
+			f1 = LinToLog(s->GetValue(), 1.0, 1000.0, FREQ_MIN, FREQ_MAX);
 
-			synthVars.osc[0].SetFrequency(f1);
+		synthVars.osc[id].SetFrequency(f1);
 
-			freqEditOsc[0]->SetValue(wxString::Format("%.2f", f1));
+		freqEditOsc[id]->SetValue(wxString::Format("%.2f", f1));
 
-			SetStatusText(wxString::Format("Pitch 1: %.2f Hz", f1));
-		}
-		else if (s->GetId() == ID_Freq2)
-		{
-			double f1;
-			if (synthVars.osc[1].IsLFO())
-				f1 = s->GetValue() * LFO_MAX/1000.0;
-			else
-				f1 = LinToLog(s->GetValue(), 1.0, 1000.0, FREQ_MIN, FREQ_MAX);
-
-			synthVars.osc[1].SetFrequency(f1);
-
-			freqEditOsc[1]->SetValue(wxString::Format("%.2f", f1));
-
-			SetStatusText(wxString::Format("Pitch 2: %.2f Hz", f1));
-		}
+		SetStatusText(wxString::Format("Pitch %d: %.2f Hz", id+1, f1));		
 	}
 
 	SetFocus();
@@ -721,14 +698,9 @@ void MyFrame::OnOscDrone(wxCommandEvent & event)
 
 	if (cb)
 	{
-		if (cb->GetId() == ID_Drone1)
-		{
-			synthVars.osc[0].SetDrone(cb->GetValue());
-		}
-		else if (cb->GetId() == ID_Drone2)
-		{
-			synthVars.osc[1].SetDrone(cb->GetValue());
-		}
+		int id = cb->GetId() - ID_Drone1;
+
+		synthVars.osc[id].SetDrone(cb->GetValue());
 	}
 	SetFocus();
 }
@@ -763,27 +735,23 @@ void MyFrame::OnOscLFO(wxCommandEvent & event)
 
 	if (cb)
 	{
-		if (cb->GetId() == ID_OscLFO1)
-		{
+		int id = cb->GetId() - ID_OscLFO1;
+		
+		synthVars.osc[id].SetLFO(cb->GetValue());
 
-		}
-		else if (cb->GetId() == ID_OscLFO2)
+		if (cb->GetValue()) //LFO scaling on
 		{
-			synthVars.osc[1].SetLFO(cb->GetValue());
-
-			if (cb->GetValue()) //LFO scaling on
-			{
-				double fFreq = freqOsc[1]->GetValue() * LFO_MAX / 1000.0;
-				freqEditOsc[1]->SetValue(wxString::Format("%.2f", fFreq));
-				synthVars.osc[1].SetFrequency(fFreq);
-			}
-			else //LFO scaling off
-			{
-				double fFreq = LinToLog(freqOsc[1]->GetValue(), 1.0, 1000.0, FREQ_MIN, FREQ_MAX);
-				freqEditOsc[1]->SetValue(wxString::Format("%.2f", fFreq));
-				synthVars.osc[1].SetFrequency(fFreq);
-			}
+			double fFreq = freqOsc[id]->GetValue() * LFO_MAX / 1000.0;
+			freqEditOsc[id]->SetValue(wxString::Format("%.2f", fFreq));
+			synthVars.osc[id].SetFrequency(fFreq);
 		}
+		else //LFO scaling off
+		{
+			double fFreq = LinToLog(freqOsc[id]->GetValue(), 1.0, 1000.0, FREQ_MIN, FREQ_MAX);
+			freqEditOsc[id]->SetValue(wxString::Format("%.2f", fFreq));
+			synthVars.osc[id].SetFrequency(fFreq);
+		}
+		
 	}
 	SetFocus();
 }
@@ -923,28 +891,16 @@ void MyFrame::OnOscFreqEdit(wxCommandEvent & event)
 
 	if (tx)
 	{
-		if (tx->GetId() == ID_FreqEdit1 /*&& event.GetKeyCode() == 13*/)
-		{
-			double r;
-			tx->GetValue().ToCDouble(&r);
-			synthVars.osc[0].SetFrequency(r);
+		int id = tx->GetId() - ID_FreqEdit1;
+		
+		double r;
+		tx->GetValue().ToCDouble(&r);
+		synthVars.osc[id].SetFrequency(r);
 
-			if (synthVars.osc[0].IsLFO())
-				freqOsc[0]->SetValue((int)synthVars.osc[0].GetFrequency() * 1000.0 / LFO_MAX);
-			else
-				freqOsc[0]->SetValue((int)LogToLin(r, FREQ_MIN, FREQ_MAX, 1.0, 1000.0));
-		}
-		else if (tx->GetId() == ID_FreqEdit2 /*&& event.GetKeyCode() == 13*/)
-		{
-			double r;
-			tx->GetValue().ToCDouble(&r);
-			synthVars.osc[1].SetFrequency(r);
-
-			if (synthVars.osc[1].IsLFO())
-				freqOsc[1]->SetValue((int)synthVars.osc[1].GetFrequency() * 1000.0/LFO_MAX);
-			else
-				freqOsc[1]->SetValue((int)LogToLin(r, FREQ_MIN, FREQ_MAX, 1.0, 1000.0));
-		}
+		if (synthVars.osc[id].IsLFO())
+			freqOsc[id]->SetValue((int)synthVars.osc[id].GetFrequency() * 1000.0 / LFO_MAX);
+		else
+			freqOsc[id]->SetValue((int)LogToLin(r, FREQ_MIN, FREQ_MAX, 1.0, 1000.0));
 	}
 }
 
