@@ -24,12 +24,13 @@ public:
 	virtual double ProcessSample(double dTime, byte channel); //override to process current sample
 	double GetTime();
 	const bool GetActive();
+	int GetActiveDevice();
 
-	static std::vector<std::string> GetDevices();
+	static std::vector<std::string> GetDevices();	
 
 
 private:
-	double(*userFunction)(double, byte);
+	double(*userFunction)(double, byte) = nullptr;
 
 	unsigned int nSampleRate;
 	unsigned int nChannels;

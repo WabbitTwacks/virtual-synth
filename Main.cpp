@@ -100,6 +100,9 @@ struct SynthVars
 
 	bool bFilter = false;
 
+	AudioInterface *audioIF;
+	string sDeviceName;
+
 	wxString debug = "Debug: ";
 
 } synthVars;
@@ -118,8 +121,6 @@ public:
 
 	virtual bool OnInit();
 	virtual int FilterEvent(wxEvent &event);
-
-	AudioInterface *audioIF;
 
 	MyFrame *pFrame;
 };
@@ -226,15 +227,15 @@ bool MyApp::OnInit()
 
 	vector<string> devices = AudioInterface::GetDevices();
 
-	audioIF = new AudioInterface(devices[0], 44100, 2, 128, 32); //use first device in list
+	synthVars.audioIF = new AudioInterface(devices[0], 44100, 2, 128, 32); //use first device in list
 
-	if (!audioIF->GetActive())
+	if (!synthVars.audioIF->GetActive())
 	{
 		wxMessageBox("Error opening audio device.", "Error");
-		audioIF->Destroy();
+		synthVars.audioIF->Destroy();
 	}
 
-	audioIF->SetUserFunction(synthFunction);
+	synthVars.audioIF->SetUserFunction(synthFunction);
 
 	ZeroMemory(routingMatrix, R_NUM_ROUTES * (R_NUM_DEVS-1));
 	routingMatrix[R_OSC1][R_FLTR_I] = true;
@@ -337,10 +338,10 @@ int MyApp::FilterEvent(wxEvent & event)
 
 MyApp::~MyApp()
 {
-	if (audioIF->GetActive())
+	if (synthVars.audioIF->GetActive())
 	{
-		audioIF->Stop();
-		audioIF->Destroy();
+		synthVars.audioIF->Stop();
+		synthVars.audioIF->Destroy();
 	}
 }
 
@@ -550,7 +551,11 @@ void MyFrame::OnConfig(wxCommandEvent & event)
 {
 	CfgWindow *cfgWin = new CfgWindow(this);
 
+	cfgWin->pAI = synthVars.audioIF;
+	cfgWin->aiBox->SetSelection(synthVars.audioIF->GetActiveDevice());
 	cfgWin->Show();
+
+	//wxMessageBox(wxString::Format("Device ID: %d", cfgWin->pAI->GetActiveDevice()), "ID");
 }
 
 void MyFrame::OnMaster(wxCommandEvent & event)

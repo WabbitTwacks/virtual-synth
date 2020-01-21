@@ -12,7 +12,7 @@ CfgWindow::CfgWindow(wxWindow *parent)
 	: wxFrame(parent, wxID_ANY, "Configuration")
 {
 	rootPanel = new wxPanel(this, wxID_ANY);
-	aiBox = new wxChoice(rootPanel, wxID_ANY);
+	aiBox = new wxChoice(rootPanel, ID_aiBox);
 	wxStaticText *aiBoxLabel = new wxStaticText(rootPanel, wxID_ANY, "Audio Device:");
 
 	aiBox->SetPosition({ 10, 32 });
@@ -20,30 +20,28 @@ CfgWindow::CfgWindow(wxWindow *parent)
 
 	aiBoxLabel->SetPosition({ 10, 16 });
 
-	//quick code for getting audio devices
-	/*int nDeviceCount = waveOutGetNumDevs();
-	vector<wstring> sDevices;
-	WAVEOUTCAPS woc;
-
-	for (int i = 0; i < nDeviceCount; i++)
-	{
-		if (waveOutGetDevCaps(i, &woc, sizeof(WAVEOUTCAPS)) == S_OK)
-		{
-			sDevices.push_back(woc.szPname);
-
-			aiBox->AppendString(woc.szPname);
-		}			
-	}*/
-
-	vector <string> sDevices = AudioInterface::GetDevices();
+	sDevices = AudioInterface::GetDevices();
 	for (auto i : sDevices)
 	{
 		aiBox->AppendString(wxString(i));
 	}
 
-	aiBox->SetSelection(0);
+	Bind(wxEVT_CHOICE, &CfgWindow::ChangeInterface, this, ID_aiBox);
 }
 
 inline CfgWindow::~CfgWindow()
 {
+}
+
+void CfgWindow::ChangeInterface(wxCommandEvent &event)
+{
+	wxChoice *cb = dynamic_cast<wxChoice*>(event.GetEventObject());
+
+	if (cb)
+	{
+		pAI->Stop();
+
+		if (!pAI->Create(sDevices[cb->GetSelection()], 44100, 2, 128, 32))
+			wxMessageBox("Failed to create!");
+	}	
 }

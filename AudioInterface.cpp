@@ -29,8 +29,6 @@ bool AudioInterface::Create(string sOutputDevice, unsigned int nSampleRate, unsi
 	this->pBlockMemory = nullptr;
 	this->pWaveHeaders = nullptr;
 
-	this->userFunction = nullptr;
-
 	//check device
 	vector<string> devices = GetDevices();
 	auto d = find(devices.begin(), devices.end(), sOutputDevice);
@@ -92,16 +90,47 @@ bool AudioInterface::Create(string sOutputDevice, unsigned int nSampleRate, unsi
 void AudioInterface::Destroy()
 {
 	if (pBlockMemory != nullptr)
+	{
 		delete[] pBlockMemory;
+		pBlockMemory = nullptr;
+	}
+		
 
 	if (pWaveHeaders != nullptr)
+	{
 		delete[] pWaveHeaders;
+		pWaveHeaders = nullptr;
+	}
+		
 }
 
 void AudioInterface::Stop()
 {
 	bReady = false;
 	audioThread.join();
+	waveOutReset(hwDevice);
+	MMRESULT mRes = waveOutClose(hwDevice);
+
+	/*switch (mRes)
+	{
+	case MMSYSERR_NOERROR:
+		MessageBox(NULL, "Success", "!", NULL);
+		break;
+	case MMSYSERR_INVALHANDLE:
+		MessageBox(NULL, "Specified device handle is invalid.", "!", NULL);
+		break;
+	case MMSYSERR_NODRIVER:
+		MessageBox(NULL, "No device driver is present.", "!", NULL);
+		break;
+	case MMSYSERR_NOMEM:
+		MessageBox(NULL, "Unable to allocate or lock memory.", "!", NULL);
+		break;
+	case WAVERR_STILLPLAYING:
+		MessageBox(NULL, "There are still buffers in the queue.", "!", NULL);
+		break;
+	}*/
+
+	Destroy();
 }
 
 double AudioInterface::ProcessSample(double dTime, byte)
@@ -130,6 +159,14 @@ vector<string> AudioInterface::GetDevices()
 	}
 
 	return sDevices;
+}
+
+int AudioInterface::GetActiveDevice()
+{
+	UINT id = 0;
+	waveOutGetID(hwDevice, &id);
+
+	return (int)id;
 }
 
 void AudioInterface::SetUserFunction(double(*func)(double, byte))
