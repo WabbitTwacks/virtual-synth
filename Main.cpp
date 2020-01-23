@@ -100,8 +100,8 @@ struct SynthVars
 
 	bool bFilter = false;
 
-	AudioInterface *audioIF;
-	string sDeviceName;
+	AudioInterface *audioIF;	
+	HMIDIIN hMidiIn = 0;
 
 	wxString debug = "Debug: ";
 
@@ -553,9 +553,9 @@ void MyFrame::OnConfig(wxCommandEvent & event)
 
 	cfgWin->pAI = synthVars.audioIF;
 	cfgWin->aiBox->SetSelection(synthVars.audioIF->GetActiveDevice());
+	cfgWin->hMidiIn = &synthVars.hMidiIn;
+	cfgWin->midiBox->SetSelection(cfgWin->GetActiveMidiID());
 	cfgWin->Show();
-
-	//wxMessageBox(wxString::Format("Device ID: %d", cfgWin->pAI->GetActiveDevice()), "ID");
 }
 
 void MyFrame::OnMaster(wxCommandEvent & event)
@@ -1087,5 +1087,5 @@ double synthFunction(double d, byte channel)
 	bench.outputBuffer.store(duration);*/
 	
 	static double dHPBuffer[2][2] = { {0.0, 0.0}, {0.0, 0.0 } };
-	return BiQuadHighPass(dOut, dHPBuffer[channel], 30.0, 1.0);
+	return BiQuadHighPass(dOut, dHPBuffer[channel], 30.0, 1.0); //filter off everything below 30Hz
 }
