@@ -163,8 +163,13 @@ vector<string> AudioInterface::GetDevices()
 
 int AudioInterface::GetActiveDevice()
 {
-	UINT id = -1;
-	waveOutGetID(hwDevice, &id);
+	if (hwDevice == nullptr)
+		return -1;
+
+	UINT id = 0;
+
+	if (waveOutGetID(hwDevice, &id) != S_OK)
+		return -1;
 
 	return (int)id;
 }

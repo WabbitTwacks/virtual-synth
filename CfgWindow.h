@@ -4,6 +4,7 @@
 #include <vector>
 #include <string>
 #include "AudioInterface.h"
+#include "MidiInterface.h"
 
 class CfgWindow : public wxFrame
 {
@@ -13,14 +14,12 @@ public:
 
 	void ChangeInterface(wxCommandEvent &event);
 	void ChangeMidiIn(wxCommandEvent &event);
-	std::vector<std::wstring> GetMidiDevices();
-	int GetActiveMidiID();
 
 	wxPanel *rootPanel;
 	wxChoice *aiBox;
 	wxChoice *midiBox;
 	AudioInterface *pAI;
-	HMIDIIN *hMidiIn;
+	MidiInterface *pMIDI;
 
 private:
 	enum

@@ -13,6 +13,7 @@
 
 #include "Helpers.h"
 #include "AudioInterface.h"
+#include "MidiInterface.h"
 #include "CfgWindow.h"
 #include "Oscillator.h"
 #include "Envelope.h"
@@ -101,7 +102,7 @@ struct SynthVars
 	bool bFilter = false;
 
 	AudioInterface *audioIF;	
-	HMIDIIN hMidiIn = 0;
+	MidiInterface *midiIF;
 
 	wxString debug = "Debug: ";
 
@@ -553,8 +554,11 @@ void MyFrame::OnConfig(wxCommandEvent & event)
 
 	cfgWin->pAI = synthVars.audioIF;
 	cfgWin->aiBox->SetSelection(synthVars.audioIF->GetActiveDevice());
-	cfgWin->hMidiIn = &synthVars.hMidiIn;
-	cfgWin->midiBox->SetSelection(cfgWin->GetActiveMidiID());
+	cfgWin->pMIDI = synthVars.midiIF;
+
+	if (synthVars.midiIF != nullptr)
+		cfgWin->midiBox->SetSelection(synthVars.midiIF->GetActiveMidiID());
+
 	cfgWin->Show();
 }
 

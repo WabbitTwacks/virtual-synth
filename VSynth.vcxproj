@@ -129,6 +129,7 @@
     <ClCompile Include="CfgWindow.cpp" />
     <ClCompile Include="Envelope.cpp" />
     <ClCompile Include="Main.cpp" />
+    <ClCompile Include="MidiInterface.cpp" />
     <ClCompile Include="Oscillator.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -139,6 +140,7 @@
     <ClInclude Include="CfgWindow.h" />
     <ClInclude Include="Envelope.h" />
     <ClInclude Include="Helpers.h" />
+    <ClInclude Include="MidiInterface.h" />
     <ClInclude Include="MiscDSP.h" />
     <ClInclude Include="Oscillator.h" />
   </ItemGroup>
