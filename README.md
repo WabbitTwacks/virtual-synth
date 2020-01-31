@@ -9,5 +9,5 @@ currently uses 2 oscillators that can be swithced to LFO mode, has an Envelope F
 
 TODO:
 Implement a simple reverb and delay,
-Implement MIDI controller support
+Implement MIDI controller support, 
 Optimization
