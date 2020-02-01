@@ -1,5 +1,5 @@
 # virtual-synth
-A Virtual Synth project for practice
+A Virtual Synth project for practice on Windows
 
 Uses the wxWidgets GUI library which you can get here: https://www.wxwidgets.org/
 Set an Environment Variable WXWIN to point to the path where your wxWidgets library is compiled.
